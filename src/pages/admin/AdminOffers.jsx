@@ -14,7 +14,7 @@ const AdminOffers = () => {
   });
 
   const fetchOffers = () => {
-    fetch('http://127.0.0.1:8000/api/offers')
+    fetch('https://protel-backend.onrender.com/api/offers')
       .then(res => res.json()).then(data => setOffers(data));
   };
 
@@ -39,8 +39,8 @@ const AdminOffers = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     const url = editingId
-      ? `http://127.0.0.1:8000/api/offers/${editingId}` // Modification
-      : 'http://127.0.0.1:8000/api/offers';             // Création
+      ? `https://protel-backend.onrender.com/api/offers/${editingId}` // Modification
+      : 'https://protel-backend.onrender.com/api/offers';             // Création
 
     const method = editingId ? 'PUT' : 'POST';
 
@@ -56,7 +56,7 @@ const AdminOffers = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm("Supprimer ?")) {
-      await fetch(`http://127.0.0.1:8000/api/offers/${id}`, { method: 'DELETE' });
+      await fetch(`https://protel-backend.onrender.com/api/offers/${id}`, { method: 'DELETE' });
       fetchOffers();
     }
   };

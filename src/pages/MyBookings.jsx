@@ -27,7 +27,7 @@ const MyBookings = () => {
     const user = JSON.parse(userStored);
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/bookings/my?userId=${user.id}`);
+      const response = await fetch(`https://protel-backend.onrender.com/api/bookings/my?userId=${user.id}`);
       if (response.ok) {
         setBookings(await response.json());
       }
@@ -45,7 +45,7 @@ const MyBookings = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Voulez-vous vraiment annuler ce voyage ?")) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/bookings/${id}`, { method: 'DELETE' });
+      await fetch(`https://protel-backend.onrender.com/api/bookings/${id}`, { method: 'DELETE' });
       toast.success("Voyage annulé");
       fetchMyBookings();
     } catch (err) {
@@ -63,7 +63,7 @@ const MyBookings = () => {
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     try {
-      await fetch(`http://127.0.0.1:8000/api/bookings/${editData.id}`, {
+      await fetch(`https://protel-backend.onrender.com/api/bookings/${editData.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

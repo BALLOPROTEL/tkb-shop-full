@@ -10,7 +10,7 @@ const OfferGrid = () => {
 
     useEffect(() => {
         // Connexion au Backend Python
-        fetch('http://127.0.0.1:8000/api/offers')
+        fetch('https://protel-backend.onrender.com/api/offers')
             .then(res => res.json())
             .then(data => {
                 // Ajout des tailles pour le design Bento

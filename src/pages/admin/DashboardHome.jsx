@@ -16,12 +16,12 @@ const DashboardHome = () => {
         const fetchData = async () => {
             try {
                 // 1. KPIs
-                const statsRes = await fetch('http://127.0.0.1:8000/api/admin/stats');
+                const statsRes = await fetch('https://protel-backend.onrender.com/api/admin/stats');
                 const statsData = await statsRes.json();
                 setKpi(statsData);
 
                 // 2. Données pour le graphe
-                const bookingsRes = await fetch('http://127.0.0.1:8000/api/admin/bookings');
+                const bookingsRes = await fetch('https://protel-backend.onrender.com/api/admin/bookings');
                 const bookingsData = await bookingsRes.json();
 
                 // Calcul répartition

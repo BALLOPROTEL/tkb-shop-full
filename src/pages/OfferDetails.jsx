@@ -22,7 +22,7 @@ const OfferDetails = () => {
     useEffect(() => {
         const fetchOffer = async () => {
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/offers/${id}`);
+                const res = await fetch(`https://protel-backend.onrender.com/api/offers/${id}`);
                 if (!res.ok) throw new Error("Offre introuvable");
                 const data = await res.json();
                 setOffer(data); // On met juste à jour l'affichage
@@ -56,7 +56,7 @@ const OfferDetails = () => {
         setIsBooking(true);
 
         try {
-            const res = await fetch('http://127.0.0.1:8000/api/bookings', {
+            const res = await fetch('https://protel-backend.onrender.com/api/bookings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

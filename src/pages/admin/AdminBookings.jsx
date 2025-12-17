@@ -9,7 +9,7 @@ const AdminBookings = () => {
 
   const fetchAllBookings = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/admin/bookings');
+      const response = await fetch('https://protel-backend.onrender.com/api/admin/bookings');
       if (response.ok) {
         const data = await response.json();
         setBookings(data);
@@ -26,7 +26,7 @@ const AdminBookings = () => {
   // --- NOUVELLE FONCTION : Changer le statut ---
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await fetch(`http://127.0.0.1:8000/api/bookings/${id}/status`, {
+      await fetch(`https://protel-backend.onrender.com/api/bookings/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -40,7 +40,7 @@ const AdminBookings = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Supprimer définitivement ?")) return;
-    await fetch(`http://127.0.0.1:8000/api/admin/bookings/${id}`, { method: 'DELETE' });
+    await fetch(`https://protel-backend.onrender.com/api/admin/bookings/${id}`, { method: 'DELETE' });
     fetchAllBookings();
   };
 

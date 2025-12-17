@@ -8,7 +8,7 @@ const AdminUsers = () => {
 
   // 1. Charger les utilisateurs depuis l'API
   const fetchUsers = () => {
-    fetch('http://127.0.0.1:8000/api/admin/users')
+    fetch('https://protel-backend.onrender.com/api/admin/users')
       .then(res => res.json())
       .then(data => setUsers(data))
       .catch(err => console.error("Erreur users", err));
@@ -19,7 +19,7 @@ const AdminUsers = () => {
   // 2. Supprimer un utilisateur
   const handleDelete = async (id) => {
     if (!window.confirm("Supprimer cet utilisateur ?")) return;
-    await fetch(`http://127.0.0.1:8000/api/admin/users/${id}`, { method: 'DELETE' });
+    await fetch(`https://protel-backend.onrender.com/api/admin/users/${id}`, { method: 'DELETE' });
     fetchUsers();
   };
 
