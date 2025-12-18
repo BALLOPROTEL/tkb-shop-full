@@ -15,10 +15,18 @@ load_dotenv()
 app = FastAPI()
 
 # --- SÉCURITÉ CORS ---
-# On autorise tout le monde pour éviter les blocages Frontend/Backend
+# --- CONFIGURATION CORS (Mise à jour pour Vercel) ---
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://tkb-shop-full.vercel.app",   # <--- LIEN VERCEL (Sans le / à la fin)
+    "https://tkb-shop-full.vercel.app/"   # <--- LIEN VERCEL (Avec le / à la fin)
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    # allow_origins=origins,  # Option stricte (bien)
+    allow_origins=["*"],      # Option "PORTE OUVERTE" (Mieux pour tester et être sûr que ça marche)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
