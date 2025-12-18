@@ -17,7 +17,7 @@ const ProductDetails = () => {
     const [selectedSize, setSelectedSize] = useState(null);
     const [selectedColor, setSelectedColor] = useState(null);
 
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "https://tkb-shop.onrender.com";
 
     useEffect(() => {
         fetch(`${API_URL}/api/products/${id}`)

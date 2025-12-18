@@ -106,7 +106,7 @@ cd backend
 python -m venv venv           # Créer un environnement virtuel
 source venv/bin/activate      # Activer (Mac/Linux) ou venv\Scripts\activate (Windows)
 pip install -r requirements.txt
-uvicorn main:app --reload     # Le serveur tourne sur http://127.0.0.1:8000
+uvicorn main:app --reload     # Le serveur tourne sur https://tkb-shop.onrender.com
 
 3.	Lancer le Frontend :
 Bash

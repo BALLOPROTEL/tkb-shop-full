@@ -17,7 +17,7 @@ const DashboardHome = () => {
     const [bannerText, setBannerText] = useState("");
 
     // URL API (LOCAL)
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "https://tkb-shop.onrender.com";
 
     useEffect(() => {
         const fetchData = async () => {

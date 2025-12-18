@@ -7,7 +7,7 @@ const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // CORRECTION MAJEURE ICI : On pointe vers le LOCAL
-  const API_URL = "http://127.0.0.1:8000";
+  const API_URL = "https://tkb-shop.onrender.com";
 
   // 1. Charger les utilisateurs depuis l'API Locale
   const fetchUsers = () => {

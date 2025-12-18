@@ -12,7 +12,7 @@ const Navbar = ({ onOpenAuth }) => {
 
     const navigate = useNavigate();
     const { cartCount } = useCart();
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "https://tkb-shop.onrender.com";
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');

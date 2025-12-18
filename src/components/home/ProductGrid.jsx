@@ -15,7 +15,7 @@ const ProductGrid = () => {
 
     const { addToCart } = useCart();
     const location = useLocation();
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "https://tkb-shop.onrender.com";
 
     // Charger les produits
     useEffect(() => {

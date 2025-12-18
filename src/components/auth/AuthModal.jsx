@@ -8,7 +8,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
 
     // --- CORRECTION ICI : ON PASSE EN LOCAL ---
     // const API_URL = "https://protel-backend.onrender.com"; // <--- ANCIEN (CLOUD)
-    const API_URL = "http://127.0.0.1:8000"; // <--- NOUVEAU (LOCAL)
+    const API_URL = "https://tkb-shop.onrender.com"; // <--- NOUVEAU (LOCAL)
 
     const [formData, setFormData] = useState({
         name: '',

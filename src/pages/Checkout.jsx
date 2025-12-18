@@ -12,7 +12,7 @@ const Checkout = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false); // État pour ouvrir le popup
 
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "https://tkb-shop.onrender.com";
 
     const [formData, setFormData] = useState({
         address: '', city: '', phone: '', paymentMethod: 'online'

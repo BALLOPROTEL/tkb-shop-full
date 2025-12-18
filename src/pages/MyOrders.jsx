@@ -7,7 +7,7 @@ const MyOrders = () => {
   const [loading, setLoading] = useState(true);
 
   // URL API (Local)
-  const API_URL = "http://127.0.0.1:8000";
+  const API_URL = "https://tkb-shop.onrender.com";
 
   useEffect(() => {
     const fetchOrders = async () => {
