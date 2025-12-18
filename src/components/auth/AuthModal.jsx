@@ -1,206 +1,150 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, User, ArrowRight, Loader2, ShieldCheck } from 'lucide-react'; // Ajout de ShieldCheck
-import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom'; // Pour la redirection
+import React, { useState } from 'react';
+import { X, Mail, Lock, User, Loader } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
-    const [isLoginView, setIsLoginView] = useState(true);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [mode, setMode] = useState(initialMode);
+    const [loading, setLoading] = useState(false);
 
-    // NOUVEAU : État pour le mode Admin
-    const [isAdminMode, setIsAdminMode] = useState(false);
+    // --- CORRECTION ICI : ON PASSE EN LOCAL ---
+    // const API_URL = "https://protel-backend.onrender.com"; // <--- ANCIEN (CLOUD)
+    const API_URL = "http://127.0.0.1:8000"; // <--- NOUVEAU (LOCAL)
 
-    const navigate = useNavigate();
-
-    const [loginData, setLoginData] = useState({ email: '', password: '' });
-    const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
-
-    useEffect(() => {
-        if (isOpen) {
-            setIsLoginView(initialMode === 'login');
-            setError('');
-            setIsAdminMode(false); // On remet à zéro à l'ouverture
-            setLoginData({ email: '', password: '' });
-            setRegisterData({ name: '', email: '', password: '' });
-        }
-    }, [isOpen, initialMode]);
-
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError('');
-
-        try {
-            const res = await fetch('https://protel-backend.onrender.com/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(loginData)
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                // --- SÉCURITÉ ADMIN ICI ---
-                if (isAdminMode && data.user.role !== 'admin') {
-                    toast.error("Accès refusé : Vous n'êtes pas administrateur ! 👮‍♂️");
-                    setIsLoading(false);
-                    return; // On arrête tout, il ne passe pas.
-                }
-
-                // Sauvegarde de la session
-                localStorage.setItem('user', JSON.stringify(data.user));
-
-                toast.success(`Bienvenue ${data.user.name} ! 👋`);
-                onClose();
-
-                // Redirection intelligente
-                setTimeout(() => {
-                    if (data.user.role === 'admin') {
-                        navigate('/admin'); // Les admins vont au tableau de bord
-                    } else {
-                        window.location.reload(); // Les clients restent sur le site
-                    }
-                }, 1000);
-
-            } else {
-                setError(data.message || "Erreur de connexion");
-                toast.error("Email ou mot de passe incorrect ❌");
-            }
-        } catch (err) {
-            toast.error("Impossible de joindre le serveur 🔌");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleRegister = async (e) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError('');
-
-        try {
-            const res = await fetch('https://protel-backend.onrender.com/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(registerData)
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                toast.success("Compte créé ! Connectez-vous maintenant. 🎉");
-                setIsLoginView(true);
-                setLoginData({ email: registerData.email, password: '' });
-            } else {
-                const msg = data.detail || "Erreur lors de l'inscription";
-                setError(msg);
-                toast.error(msg);
-            }
-        } catch (err) {
-            toast.error("Impossible de joindre le serveur 🔌");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: ''
+    });
 
     if (!isOpen) return null;
 
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+
+        const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+
+        try {
+            const res = await fetch(`${API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                toast.success(mode === 'login' ? "Connexion réussie !" : "Compte créé !");
+
+                // Si connexion réussie, on sauvegarde l'user
+                if (mode === 'login' || data.user) {
+                    localStorage.setItem('user', JSON.stringify(data.user || {
+                        id: data.userId,
+                        name: formData.name,
+                        email: formData.email,
+                        role: 'client'
+                    }));
+                    window.location.reload(); // Recharger pour mettre à jour la Navbar
+                } else {
+                    // Si inscription, on bascule vers la connexion
+                    setMode('login');
+                }
+                onClose();
+            } else {
+                toast.error(data.detail || data.message || "Une erreur est survenue");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Impossible de joindre le serveur local 🔌");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm cursor-pointer"
-                    />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-300">
 
-                    <div className="relative w-full max-w-md perspective-1000">
-                        <motion.div
-                            initial={false}
-                            animate={{ rotateY: isLoginView ? 0 : 180 }}
-                            transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
-                            style={{ transformStyle: "preserve-3d" }}
-                            className="relative w-full h-[550px]"
+                {/* Header avec dégradé */}
+                <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-8 text-center relative">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
+                        <X size={24} />
+                    </button>
+                    <h2 className="text-3xl font-bold text-white mb-2">
+                        {mode === 'login' ? 'Bon retour !' : 'Rejoignez-nous'}
+                    </h2>
+                    <p className="text-slate-400 text-sm">
+                        {mode === 'login' ? 'Connectez-vous pour accéder à votre espace' : 'Créez votre compte en quelques secondes'}
+                    </p>
+                </div>
+
+                {/* Formulaire */}
+                <div className="p-8">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+
+                        {mode === 'register' && (
+                            <div className="relative">
+                                <User className="absolute left-4 top-3.5 text-slate-400" size={20} />
+                                <input
+                                    type="text"
+                                    placeholder="Votre nom"
+                                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        )}
+
+                        <div className="relative">
+                            <Mail className="absolute left-4 top-3.5 text-slate-400" size={20} />
+                            <input
+                                type="email"
+                                placeholder="Votre email"
+                                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        <div className="relative">
+                            <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
+                            <input
+                                type="password"
+                                placeholder="Mot de passe"
+                                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-400"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                required
+                            />
+                        </div>
+
+                        <button
+                            disabled={loading}
+                            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex justify-center items-center gap-2"
                         >
+                            {loading && <Loader className="animate-spin" size={20} />}
+                            {mode === 'login' ? 'Se connecter' : "S'inscrire"}
+                        </button>
 
-                            {/* === LOGIN (FACE AVANT) === */}
-                            <div
-                                className={`absolute inset-0 backface-hidden bg-slate-900 rounded-3xl shadow-2xl overflow-hidden flex flex-col border-2 ${isAdminMode ? 'border-purple-500' : 'border-blue-500'} transition-colors duration-500`}
-                                style={{ backfaceVisibility: 'hidden' }}
+                    </form>
+
+                    <div className="mt-6 text-center">
+                        <p className="text-slate-500 text-sm">
+                            {mode === 'login' ? "Pas encore de compte ?" : "Déjà membre ?"}
+                            <button
+                                onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                                className="text-blue-600 font-bold ml-2 hover:underline"
                             >
-                                <div className={`h-32 shrink-0 bg-gradient-to-br ${isAdminMode ? 'from-purple-900 to-slate-900' : 'from-blue-600 to-purple-600'} relative overflow-hidden flex items-center justify-center transition-all duration-500`}>
-                                    <h2 className="text-3xl font-bold text-white relative z-10">
-                                        {isAdminMode ? "Espace Admin" : "Bon retour !"}
-                                    </h2>
-                                    <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white"><X size={24} /></button>
-                                </div>
-
-                                <div className="p-8 flex-1 flex flex-col justify-center">
-                                    {error && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 text-red-200 text-sm rounded-lg text-center">{error}</div>}
-
-                                    <form className="space-y-4" onSubmit={handleLogin}>
-
-                                        {/* TOGGLE ADMIN */}
-                                        <div className="flex items-center justify-end mb-2">
-                                            <label className="flex items-center cursor-pointer gap-2 text-sm text-slate-400 hover:text-white transition-colors">
-                                                <span className="font-medium">Admin ?</span>
-                                                <div className="relative">
-                                                    <input type="checkbox" className="sr-only" checked={isAdminMode} onChange={() => setIsAdminMode(!isAdminMode)} />
-                                                    <div className={`block w-10 h-6 rounded-full ${isAdminMode ? 'bg-purple-600' : 'bg-slate-700'}`}></div>
-                                                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isAdminMode ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                                                </div>
-                                            </label>
-                                        </div>
-
-                                        <div className="relative">
-                                            <Mail className="absolute left-4 top-3.5 text-slate-500" size={20} />
-                                            <input type="email" placeholder="Email" required value={loginData.email} onChange={(e) => setLoginData({ ...loginData, email: e.target.value })} className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-500" />
-                                        </div>
-                                        <div className="relative">
-                                            <Lock className="absolute left-4 top-3.5 text-slate-500" size={20} />
-                                            <input type="password" placeholder="Mot de passe" required value={loginData.password} onChange={(e) => setLoginData({ ...loginData, password: e.target.value })} className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-500" />
-                                        </div>
-
-                                        <button disabled={isLoading} className={`w-full text-white font-bold py-3.5 rounded-xl shadow-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2 ${isAdminMode ? 'bg-purple-600 hover:bg-purple-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
-                                            {isLoading ? <Loader2 className="animate-spin" /> : <>{isAdminMode ? "Accéder au Dashboard" : "Se connecter"} <ArrowRight size={18} /></>}
-                                        </button>
-                                    </form>
-
-                                    <div className="mt-auto pt-6 text-center">
-                                        <p className="text-slate-500">Pas encore de compte ?</p>
-                                        <button onClick={() => setIsLoginView(false)} className="text-blue-400 font-bold hover:text-blue-300 hover:underline mt-1">Créer un compte</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* === REGISTER (FACE ARRIÈRE) - Pas de mode admin ici === */}
-                            <div
-                                className="absolute inset-0 backface-hidden bg-slate-900 rounded-3xl shadow-2xl overflow-hidden text-white flex flex-col border-2 border-blue-500"
-                                style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-                            >
-                                {/* ... (Le code du register reste identique à avant) ... */}
-                                <div className="h-24 shrink-0 bg-gradient-to-bl from-pink-500 to-orange-500 relative flex items-center justify-center">
-                                    <h2 className="text-2xl font-bold text-white">Rejoignez l'aventure</h2>
-                                    <button onClick={onClose} className="absolute top-4 left-4 text-white/80 hover:text-white"><X size={24} /></button>
-                                </div>
-                                <div className="p-8 flex-1 flex flex-col justify-center">
-                                    {error && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 text-red-200 text-sm rounded-lg text-center">{error}</div>}
-                                    <form className="space-y-4" onSubmit={handleRegister}>
-                                        <div className="relative"><User className="absolute left-4 top-3.5 text-slate-500" size={20} /><input type="text" placeholder="Nom complet" required value={registerData.name} onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })} className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white" /></div>
-                                        <div className="relative"><Mail className="absolute left-4 top-3.5 text-slate-500" size={20} /><input type="email" placeholder="Email" required value={registerData.email} onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })} className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white" /></div>
-                                        <div className="relative"><Lock className="absolute left-4 top-3.5 text-slate-500" size={20} /><input type="password" placeholder="Mot de passe" required value={registerData.password} onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })} className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white" /></div>
-                                        <button disabled={isLoading} className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold py-3.5 rounded-xl mt-2">{isLoading ? <Loader2 className="animate-spin" /> : "S'inscrire"}</button>
-                                    </form>
-                                    <div className="mt-auto pt-6 text-center"><p className="text-slate-400 text-sm">Déjà membre ?</p><button onClick={() => setIsLoginView(true)} className="text-orange-400 font-bold hover:text-orange-300 text-sm mt-1">Se connecter</button></div>
-                                </div>
-                            </div>
-
-                        </motion.div>
+                                {mode === 'login' ? "S'inscrire" : "Se connecter"}
+                            </button>
+                        </p>
                     </div>
                 </div>
-            )}
-        </AnimatePresence>
+
+            </div>
+        </div>
     );
 };
 

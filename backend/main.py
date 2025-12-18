@@ -14,9 +14,8 @@ load_dotenv()
 
 app = FastAPI()
 
-# --- SÉCURITÉ CORS (CRUCIAL) ---
-# On autorise tout le monde pour éviter les erreurs "Network Error"
-# Une fois que tout marche, on pourra restreindre si tu veux.
+# --- SÉCURITÉ CORS ---
+# On autorise tout le monde pour éviter les blocages Frontend/Backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -26,21 +25,25 @@ app.add_middleware(
 )
 
 # --- CONNEXION BASE DE DONNÉES ---
-# Le code cherche d'abord la variable "MONGO_URI" (sur Render)
-# Sinon, il utilise le lien local (sur ton PC)
+# 1. Cherche la variable Render
 mongo_uri = os.getenv("MONGO_URI")
 
 if not mongo_uri:
-    # Si pas de variable (donc on est sur ton PC), on met localhost
-    print("⚠️ Mode LOCAL détecté")
-    client = MongoClient("mongodb://localhost:27017")
+    # 2. Si pas de variable Render, utilise le local (PC)
+    print("⚠️ Mode LOCAL détecté (PC)")
+    client = MongoClient("mongodb://127.0.0.1:27017")
 else:
-    # Si variable trouvée (on est sur Render), on se connecte au Cloud
+    # 3. Si variable trouvée, utilise le Cloud (Atlas)
     print("✅ Mode CLOUD détecté (Atlas)")
-    # tlsAllowInvalidCertificates=True aide parfois à éviter les erreurs SSL
     client = MongoClient(mongo_uri, tls=True, tlsAllowInvalidCertificates=True)
 
-db = client.protel_travel
+db = client.protel_shop  # J'ai changé le nom de la base pour "protel_shop"
+
+
+
+# --- MODÈLE PARAMÈTRES SITE ---
+class SiteSettings(BaseModel):
+    bannerText: str
 
 # --- MODÈLES ET OUTILS ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -49,6 +52,7 @@ def fix_id(doc):
     doc["id"] = str(doc.pop("_id"))
     return doc
 
+# --- MODÈLES UTILISATEURS ---
 class UserRegister(BaseModel):
     name: str
     email: str
@@ -58,41 +62,55 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class OfferModel(BaseModel):
-    title: str
-    location: str
-    type: str
+
+
+
+# --- MODÈLE PRODUIT (MISE À JOUR) ---
+class Product(BaseModel):
+    id: Optional[str] = None
+    name: str
+    category: str
     price: float
-    rating: float = 4.5
+    oldPrice: Optional[float] = None  # <--- NOUVEAU : Ancien prix (peut être vide)
+    stock: int
     image: str
+    description: Optional[str] = None
+    status: str = "Active"
+    colors: List[str] = []            # <--- NOUVEAU : Liste de couleurs (codes HEX)
+
+
+# --- MODÈLES PRODUITS (Sacs, Chaussures, etc.) ---
+class ProductModel(BaseModel):
+    name: str           # Ex: "Sac à main Luxe"
+    category: str       # Ex: "sac", "chaussure", "accessoire"
+    price: float        # Ex: 45000
+    oldPrice: Optional[float] = None # Pour afficher une promo (barré)
+    image: str          # URL de l'image
     description: Optional[str] = ""
+    rating: float = 4.5
+    stock: int = 10     # Quantité disponible
     status: str = "Active"
 
-class BookingCreate(BaseModel):
+# --- MODÈLES COMMANDES ---
+class OrderCreate(BaseModel):
     userId: str
-    offerId: str
-    offerTitle: str
-    location: str
+    productId: str
+    productName: str
     price: float
-    dateStart: str
-    dateEnd: str
-    guests: int
+    quantity: int       # Nombre d'articles
+    totalPrice: float   # Prix x Quantité
+    address: str        # Adresse de livraison
 
-class BookingUpdate(BaseModel):
-    dateStart: str
-    dateEnd: str
-    guests: int
-
-class BookingStatus(BaseModel):
-    status: str
+class OrderStatus(BaseModel):
+    status: str         # "En attente", "Livré", "Annulé"
 
 # --- ROUTES ---
 
 @app.get("/")
 def home():
-    return {"message": "API PROTEL EN LIGNE 🚀"}
+    return {"message": "API PROTEL SHOP V1 Ready 🛍️"}
 
-# AUTH
+# --- AUTHENTIFICATION (Inchangé) ---
 @app.post("/api/auth/register")
 def register(user: UserRegister):
     if db.users.find_one({"email": user.email}):
@@ -111,87 +129,125 @@ def login(creds: UserLogin):
         return {"success": False, "message": "Identifiants incorrects"}
     return {"success": True, "user": {"id": str(user["_id"]), "name": user["name"], "email": user["email"], "role": user.get("role", "client")}}
 
-# OFFRES
-@app.get("/api/offers")
-def get_offers():
-    return [fix_id(o) for o in db.offers.find()]
+# --- GESTION DES PRODUITS (CRUD) ---
 
-@app.get("/api/offers/{id}")
-def get_offer(id: str):
-    o = db.offers.find_one({"_id": ObjectId(id)})
-    if o: return fix_id(o)
-    raise HTTPException(404, "Offre introuvable")
+@app.get("/api/products")
+def get_products():
+    # Récupère tous les produits
+    return [fix_id(p) for p in db.products.find()]
 
-@app.post("/api/offers")
-def create_offer(o: OfferModel):
-    res = db.offers.insert_one(o.dict())
+@app.get("/api/products/{id}")
+def get_product(id: str):
+    p = db.products.find_one({"_id": ObjectId(id)})
+    if p: return fix_id(p)
+    raise HTTPException(404, "Produit introuvable")
+
+@app.post("/api/products")
+def create_product(p: ProductModel):
+    # Ajoute un nouveau sac ou chaussure
+    res = db.products.insert_one(p.dict())
     return {"success": True, "id": str(res.inserted_id)}
 
-@app.put("/api/offers/{id}")
-def update_offer(id: str, o: OfferModel):
-    db.offers.update_one({"_id": ObjectId(id)}, {"$set": o.dict()})
+# Route pour modifier un produit
+@app.put("/api/products/{id}")
+def update_product(id: str, p: Product):  # <--- ATTENTION : Utilise "Product", pas "ProductModel"
+    # On convertit les données reçues en dictionnaire
+    # exclude_unset=True est important : ça évite d'effacer des champs si on ne les envoie pas
+    updated_data = p.dict(exclude_unset=True)
+    
+    # On met à jour dans la base de données
+    result = db.products.update_one(
+        {"_id": ObjectId(id)}, 
+        {"$set": updated_data}
+    )
+    
+    if result.modified_count == 1:
+        return {"success": True, "message": "Produit mis à jour"}
+    else:
+        return {"success": False, "message": "Aucun changement ou produit introuvable"}
+
+@app.delete("/api/products/{id}")
+def delete_product(id: str):
+    db.products.delete_one({"_id": ObjectId(id)})
     return {"success": True}
 
-@app.delete("/api/offers/{id}")
-def delete_offer(id: str):
-    db.offers.delete_one({"_id": ObjectId(id)})
-    return {"success": True}
+# --- GESTION DES COMMANDES (Panier) ---
 
-# BOOKINGS
-@app.post("/api/bookings")
-def create_booking(b: BookingCreate):
-    data = b.dict()
-    data.update({"status": "confirmed", "createdAt": datetime.now()})
-    res = db.reservations.insert_one(data)
+@app.post("/api/orders")
+def create_order(order: OrderCreate):
+    # 1. Vérifier le stock
+    product = db.products.find_one({"_id": ObjectId(order.productId)})
+    if not product or product.get("stock", 0) < order.quantity:
+         raise HTTPException(400, "Stock insuffisant !")
+
+    # 2. Créer la commande
+    data = order.dict()
+    data.update({"status": "En préparation", "createdAt": datetime.now()})
+    res = db.orders.insert_one(data)
+
+    # 3. Mettre à jour le stock (Décrémenter)
+    db.products.update_one(
+        {"_id": ObjectId(order.productId)},
+        {"$inc": {"stock": -order.quantity}}
+    )
+    
     return {"success": True, "id": str(res.inserted_id)}
 
-@app.get("/api/bookings/my")
-def my_bookings(userId: str):
-    return [fix_id(b) for b in db.reservations.find({"userId": userId})]
+@app.get("/api/orders/my")
+def my_orders(userId: str):
+    return [fix_id(o) for o in db.orders.find({"userId": userId})]
 
-@app.put("/api/bookings/{id}")
-def update_booking(id: str, b: BookingUpdate):
-    db.reservations.update_one({"_id": ObjectId(id)}, {"$set": {"dateStart": b.dateStart, "dateEnd": b.dateEnd, "guests": b.guests}})
+
+
+
+# --- ROUTES PARAMÈTRES (Pour la bannière pub) ---
+@app.get("/api/settings")
+def get_settings():
+    # On cherche les réglages, s'ils n'existent pas, on en crée par défaut
+    settings = db.settings.find_one({"_id": "global_settings"})
+    if not settings:
+        return {"bannerText": "Bienvenue sur PROTEL Shop ! Livraison offerte dès 50.000F 🚚"}
+    return {"bannerText": settings.get("bannerText")}
+
+@app.post("/api/settings")
+def update_settings(s: SiteSettings):
+    # On met à jour le texte (upsert=True signifie "crée si ça n'existe pas")
+    db.settings.update_one(
+        {"_id": "global_settings"}, 
+        {"$set": {"bannerText": s.bannerText}}, 
+        upsert=True
+    )
     return {"success": True}
 
-@app.delete("/api/bookings/{id}")
-def cancel_booking(id: str):
-    db.reservations.update_one({"_id": ObjectId(id)}, {"$set": {"status": "cancelled"}})
-    return {"success": True}
+# --- ROUTES ADMIN ---
 
-# ADMIN
 @app.get("/api/admin/users")
 def get_users():
     return [fix_id(u) for u in db.users.find({}, {"password": 0})]
 
-@app.delete("/api/admin/users/{id}")
-def del_user(id: str):
-    db.users.delete_one({"_id": ObjectId(id)})
-    return {"success": True}
+@app.get("/api/admin/orders")
+def all_orders():
+    orders = []
+    for o in db.orders.find():
+        # On récupère le nom du client pour l'afficher
+        u = db.users.find_one({"_id": ObjectId(o["userId"])})
+        o["userName"] = u["name"] if u else "Client Inconnu"
+        orders.append(fix_id(o))
+    return orders
 
-@app.get("/api/admin/bookings")
-def all_bookings():
-    res = []
-    for b in db.reservations.find():
-        u = db.users.find_one({"_id": ObjectId(b["userId"])})
-        b["userName"] = u["name"] if u else "Inconnu"
-        res.append(fix_id(b))
-    return res
-
-@app.put("/api/bookings/{id}/status")
-def set_status(id: str, s: BookingStatus):
-    db.reservations.update_one({"_id": ObjectId(id)}, {"$set": {"status": s.status}})
-    return {"success": True}
-
-@app.delete("/api/admin/bookings/{id}")
-def del_booking(id: str):
-    db.reservations.delete_one({"_id": ObjectId(id)})
+@app.put("/api/orders/{id}/status")
+def set_order_status(id: str, s: OrderStatus):
+    # Changer le statut (ex: "Expédié")
+    db.orders.update_one({"_id": ObjectId(id)}, {"$set": {"status": s.status}})
     return {"success": True}
 
 @app.get("/api/admin/stats")
 def stats():
+    # Calcul du chiffre d'affaires
+    total_revenue = sum(o.get("totalPrice", 0) for o in db.orders.find())
     return {
-        "revenue": sum(b.get("price", 0) for b in db.reservations.find()),
+        "revenue": total_revenue,
         "usersCount": db.users.count_documents({}),
-        "bookingsCount": db.reservations.count_documents({})
+        "productsCount": db.products.count_documents({}),
+        "ordersCount": db.orders.count_documents({})
     }
