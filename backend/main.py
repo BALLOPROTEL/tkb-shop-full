@@ -31,10 +31,14 @@ app.add_middleware(
 )
 
 # --- 2. CONFIGURATION EMAIL (OBLIGATOIRE POUR L'INSCRIPTION) ---
-# ⚠️ REMPLACE PAR TES VRAIES INFOS GMAIL
-# Pour le mot de passe, utilise un "Mot de passe d'application" Google (pas ton vrai mdp)
-MAIL_USERNAME = "leprotel@gmail.com" 
-MAIL_PASSWORD = "ekjp jwxx aips crrm" # <--- À CHANGER (Code à 16 lettres)
+# --- 2. CONFIGURATION EMAIL (SÉCURISÉE) ---
+# On récupère les infos depuis Render (Environment Variables)
+MAIL_USERNAME = os.getenv("MAIL_USERNAME")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
+
+# Vérification de sécurité (pour les logs)
+if not MAIL_USERNAME or not MAIL_PASSWORD:
+    print("⚠️ ATTENTION : Identifiants Email non configurés sur le serveur !")
 
 conf = ConnectionConfig(
     MAIL_USERNAME=MAIL_USERNAME,
@@ -47,7 +51,6 @@ conf = ConnectionConfig(
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True
 )
-
 # --- 3. CONNEXION DB ---
 mongo_uri = os.getenv("MONGO_URI")
 if not mongo_uri:
