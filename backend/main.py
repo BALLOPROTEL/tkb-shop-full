@@ -40,14 +40,15 @@ MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 if not MAIL_USERNAME or not MAIL_PASSWORD:
     print("⚠️ ATTENTION : Identifiants Email non configurés sur le serveur !")
 
+# --- CONFIGURATION EMAIL MODIFIÉE (PORT 465 SSL) ---
 conf = ConnectionConfig(
     MAIL_USERNAME=MAIL_USERNAME,
     MAIL_PASSWORD=MAIL_PASSWORD,
     MAIL_FROM=MAIL_USERNAME,
-    MAIL_PORT=587,
+    MAIL_PORT=465,              # <--- CHANGEMENT : On passe au port 465
     MAIL_SERVER="smtp.gmail.com",
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
+    MAIL_STARTTLS=False,        # <--- CHANGEMENT : On désactive STARTTLS
+    MAIL_SSL_TLS=True,          # <--- CHANGEMENT : On active SSL (Force)
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True
 )
