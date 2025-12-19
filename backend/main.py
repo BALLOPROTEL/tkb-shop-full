@@ -1,225 +1,272 @@
-import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
-from passlib.context import CryptContext
+from pymongo import MongoClient
 from bson import ObjectId
+from passlib.context import CryptContext
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+from fastapi.security import OAuth2PasswordBearer
+import os
+import random
 from datetime import datetime
-from dotenv import load_dotenv
-
-# Charge les variables d'environnement (si en local)
-load_dotenv()
 
 app = FastAPI()
 
-# --- SÉCURITÉ CORS ---
-# --- CONFIGURATION CORS (Mise à jour pour Vercel) ---
+# --- 1. SÉCURITÉ CORS (RESTREINTE) ---
+# Seuls ton PC et ton site Vercel ont le droit de parler au Backend
 origins = [
-    "http://localhost:5173",
+    "http://localhost:5173",       # Ton Frontend Local
     "http://127.0.0.1:5173",
-    "https://tkb-shop-full.vercel.app",   # <--- LIEN VERCEL (Sans le / à la fin)
-    "https://tkb-shop-full.vercel.app/"   # <--- LIEN VERCEL (Avec le / à la fin)
+    "https://tkb-shop-full.vercel.app", # <--- TON LIEN VERCEL (Sans slash à la fin)
+    "https://tkb-shop-full.vercel.app/" # (Avec slash, au cas où)
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=origins,  # Option stricte (bien)
-    allow_origins=["*"],      # Option "PORTE OUVERTE" (Mieux pour tester et être sûr que ça marche)
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- CONNEXION BASE DE DONNÉES ---
-# 1. Cherche la variable Render
-mongo_uri = os.getenv("MONGO_URI")
+# --- 2. CONFIGURATION EMAIL (OBLIGATOIRE POUR L'INSCRIPTION) ---
+# ⚠️ REMPLACE PAR TES VRAIES INFOS GMAIL
+# Pour le mot de passe, utilise un "Mot de passe d'application" Google (pas ton vrai mdp)
+MAIL_USERNAME = "leprotel@gmail.com" 
+MAIL_PASSWORD = "ekjp jwxx aips crrm" # <--- À CHANGER (Code à 16 lettres)
 
+conf = ConnectionConfig(
+    MAIL_USERNAME=MAIL_USERNAME,
+    MAIL_PASSWORD=MAIL_PASSWORD,
+    MAIL_FROM=MAIL_USERNAME,
+    MAIL_PORT=587,
+    MAIL_SERVER="smtp.gmail.com",
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
+)
+
+# --- 3. CONNEXION DB ---
+mongo_uri = os.getenv("MONGO_URI")
 if not mongo_uri:
-    # 2. Si pas de variable Render, utilise le local (PC)
-    print("⚠️ Mode LOCAL détecté (PC)")
+    # Mode Local (PC)
     client = MongoClient("mongodb://127.0.0.1:27017")
 else:
-    # 3. Si variable trouvée, utilise le Cloud (Atlas)
-    print("✅ Mode CLOUD détecté (Atlas)")
-    client = MongoClient(mongo_uri, tls=True, tlsAllowInvalidCertificates=True)
+    # Mode Cloud (Render)
+    client = MongoClient(mongo_uri)
 
-db = client.protel_shop  # J'ai changé le nom de la base pour "protel_shop"
+# On force l'utilisation de la base 'protel_shop'
+db = client.get_database("protel_shop")
 
-
-
-# --- MODÈLE PARAMÈTRES SITE ---
-class SiteSettings(BaseModel):
-    bannerText: str
-
-# --- MODÈLES ET OUTILS ---
+# --- 4. SÉCURITÉ & HASHAGE ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-def fix_id(doc):
-    doc["id"] = str(doc.pop("_id"))
-    return doc
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-# --- MODÈLES UTILISATEURS ---
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+# --- 5. MODÈLES DE DONNÉES ---
 class UserRegister(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     password: str
 
 class UserLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
+class VerifyOTP(BaseModel):
+    email: EmailStr
+    otp: str
 
-
-
-# --- MODÈLE PRODUIT (MISE À JOUR) ---
 class Product(BaseModel):
     id: Optional[str] = None
     name: str
     category: str
     price: float
-    oldPrice: Optional[float] = None  # <--- NOUVEAU : Ancien prix (peut être vide)
+    oldPrice: Optional[float] = None
     stock: int
     image: str
     description: Optional[str] = None
     status: str = "Active"
-    colors: List[str] = []            # <--- NOUVEAU : Liste de couleurs (codes HEX)
+    colors: List[str] = []
 
-
-# --- MODÈLES PRODUITS (Sacs, Chaussures, etc.) ---
-class ProductModel(BaseModel):
-    name: str           # Ex: "Sac à main Luxe"
-    category: str       # Ex: "sac", "chaussure", "accessoire"
-    price: float        # Ex: 45000
-    oldPrice: Optional[float] = None # Pour afficher une promo (barré)
-    image: str          # URL de l'image
-    description: Optional[str] = ""
-    rating: float = 4.5
-    stock: int = 10     # Quantité disponible
-    status: str = "Active"
-
-# --- MODÈLES COMMANDES ---
-class OrderCreate(BaseModel):
+class Order(BaseModel):
     userId: str
     productId: str
     productName: str
     price: float
-    quantity: int       # Nombre d'articles
-    totalPrice: float   # Prix x Quantité
-    address: str        # Adresse de livraison
+    quantity: int
+    totalPrice: float
+    address: str
+    status: str = "En préparation"
+    paymentId: Optional[str] = None
+    createdAt: datetime = Field(default_factory=datetime.now)
 
-class OrderStatus(BaseModel):
-    status: str         # "En attente", "Livré", "Annulé"
+class SiteSettings(BaseModel):
+    bannerText: str
 
-# --- ROUTES ---
+# --- 6. ROUTES AUTHENTIFICATION (Le Coeur du système) ---
 
-@app.get("/")
-def home():
-    return {"message": "API PROTEL SHOP V1 Ready 🛍️"}
-
-# --- AUTHENTIFICATION (Inchangé) ---
 @app.post("/api/auth/register")
-def register(user: UserRegister):
+async def register(user: UserRegister, background_tasks: BackgroundTasks):
+    # 1. Vérifier si l'email existe déjà
     if db.users.find_one({"email": user.email}):
-        raise HTTPException(status_code=400, detail="Email déjà utilisé")
-    hashed = pwd_context.hash(user.password)
-    res = db.users.insert_one({
-        "name": user.name, "email": user.email, "password": hashed,
-        "role": "client", "joinDate": datetime.now().strftime("%d %b %Y"), "status": "active"
-    })
-    return {"success": True, "userId": str(res.inserted_id)}
+        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
+
+    # 2. Générer un code OTP (6 chiffres)
+    otp_code = str(random.randint(100000, 999999))
+
+    # 3. Préparer l'email
+    message = MessageSchema(
+        subject="Votre code TKB SHOP",
+        recipients=[user.email],
+        body=f"Bienvenue {user.name} ! <br> Votre code de validation est : <strong>{otp_code}</strong>",
+        subtype=MessageType.html
+    )
+
+    # 4. Envoyer l'email (Tâche de fond pour ne pas ralentir le site)
+    try:
+        fm = FastMail(conf)
+        background_tasks.add_task(fm.send_message, message)
+    except Exception as e:
+        print(f"Erreur Email: {e}")
+        # On continue quand même, mais idéalement il faudrait gérer l'erreur
+
+    # 5. Sauvegarder l'utilisateur (Non vérifié)
+    hashed_pw = get_password_hash(user.password)
+    user_dict = {
+        "name": user.name,
+        "email": user.email,
+        "password": hashed_pw,
+        "role": "client",
+        "isVerified": False, # <--- Bloqué tant que pas validé
+        "otpCode": otp_code,
+        "createdAt": datetime.now()
+    }
+    db.users.insert_one(user_dict)
+
+    return {"success": True, "message": "Code envoyé par email !"}
+
+@app.post("/api/auth/verify")
+async def verify_account(data: VerifyOTP):
+    user = db.users.find_one({"email": data.email})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    
+    if user.get("isVerified"):
+        return {"success": True, "message": "Déjà vérifié", "user": _format_user(user)}
+
+    if user.get("otpCode") == data.otp:
+        # Code BON : On valide le compte
+        db.users.update_one({"email": data.email}, {"$set": {"isVerified": True, "otpCode": None}})
+        return {"success": True, "user": _format_user(user)}
+    else:
+        raise HTTPException(status_code=400, detail="Code incorrect !")
 
 @app.post("/api/auth/login")
-def login(creds: UserLogin):
-    user = db.users.find_one({"email": creds.email})
-    if not user or not pwd_context.verify(creds.password, user["password"]):
-        return {"success": False, "message": "Identifiants incorrects"}
-    return {"success": True, "user": {"id": str(user["_id"]), "name": user["name"], "email": user["email"], "role": user.get("role", "client")}}
+def login(user: UserLogin):
+    db_user = db.users.find_one({"email": user.email})
+    
+    if not db_user or not verify_password(user.password, db_user["password"]):
+        raise HTTPException(status_code=400, detail="Email ou mot de passe incorrect")
+    
+    # Bloquer si le compte n'est pas vérifié
+    if db_user.get("isVerified") == False:
+         raise HTTPException(status_code=400, detail="Compte non vérifié. Vérifiez vos emails.")
 
-# --- GESTION DES PRODUITS (CRUD) ---
+    return {"success": True, "user": _format_user(db_user)}
+
+# Helper pour formater l'user avant envoi (supprime mdp)
+def _format_user(user_data):
+    user_data["id"] = str(user_data["_id"])
+    del user_data["_id"]
+    if "password" in user_data: del user_data["password"]
+    if "otpCode" in user_data: del user_data["otpCode"]
+    return user_data
+
+# --- 7. ROUTES PRODUITS ---
 
 @app.get("/api/products")
 def get_products():
-    # Récupère tous les produits
-    return [fix_id(p) for p in db.products.find()]
+    products = []
+    for p in db.products.find():
+        p["id"] = str(p["_id"])
+        del p["_id"]
+        products.append(p)
+    return products
 
 @app.get("/api/products/{id}")
 def get_product(id: str):
-    p = db.products.find_one({"_id": ObjectId(id)})
-    if p: return fix_id(p)
-    raise HTTPException(404, "Produit introuvable")
+    try:
+        p = db.products.find_one({"_id": ObjectId(id)})
+        if p:
+            p["id"] = str(p["_id"])
+            del p["_id"]
+            return p
+        raise HTTPException(status_code=404, detail="Produit non trouvé")
+    except:
+        raise HTTPException(status_code=404, detail="ID Invalide")
 
 @app.post("/api/products")
-def create_product(p: ProductModel):
-    # Ajoute un nouveau sac ou chaussure
-    res = db.products.insert_one(p.dict())
-    return {"success": True, "id": str(res.inserted_id)}
+def create_product(p: Product):
+    p_dict = p.dict()
+    result = db.products.insert_one(p_dict)
+    return {"success": True, "id": str(result.inserted_id)}
 
-# Route pour modifier un produit
 @app.put("/api/products/{id}")
-def update_product(id: str, p: Product):  # <--- ATTENTION : Utilise "Product", pas "ProductModel"
-    # On convertit les données reçues en dictionnaire
-    # exclude_unset=True est important : ça évite d'effacer des champs si on ne les envoie pas
+def update_product(id: str, p: Product):
     updated_data = p.dict(exclude_unset=True)
-    
-    # On met à jour dans la base de données
-    result = db.products.update_one(
-        {"_id": ObjectId(id)}, 
-        {"$set": updated_data}
-    )
-    
-    if result.modified_count == 1:
-        return {"success": True, "message": "Produit mis à jour"}
-    else:
-        return {"success": False, "message": "Aucun changement ou produit introuvable"}
+    db.products.update_one({"_id": ObjectId(id)}, {"$set": updated_data})
+    return {"success": True}
 
 @app.delete("/api/products/{id}")
 def delete_product(id: str):
     db.products.delete_one({"_id": ObjectId(id)})
     return {"success": True}
 
-# --- GESTION DES COMMANDES (Panier) ---
+# --- 8. ROUTES COMMANDES (ORDERS) ---
+@app.get("/api/admin/orders")
+def get_all_orders():
+    orders = []
+    # On récupère les commandes du plus récent au plus vieux
+    for o in db.orders.find().sort("createdAt", -1):
+        o["id"] = str(o["_id"])
+        del o["_id"]
+        # On essaie de récupérer le nom du client
+        user = db.users.find_one({"_id": ObjectId(o["userId"])})
+        o["userName"] = user["name"] if user else "Inconnu"
+        orders.append(o)
+    return orders
 
 @app.post("/api/orders")
-def create_order(order: OrderCreate):
-    # 1. Vérifier le stock
-    product = db.products.find_one({"_id": ObjectId(order.productId)})
-    if not product or product.get("stock", 0) < order.quantity:
-         raise HTTPException(400, "Stock insuffisant !")
+def create_order(o: Order):
+    o_dict = o.dict()
+    result = db.orders.insert_one(o_dict)
+    return {"success": True, "id": str(result.inserted_id)}
 
-    # 2. Créer la commande
-    data = order.dict()
-    data.update({"status": "En préparation", "createdAt": datetime.now()})
-    res = db.orders.insert_one(data)
+@app.put("/api/orders/{id}/status")
+def update_order_status(id: str, status: dict):
+    # status attendu : {"status": "Livré"}
+    db.orders.update_one({"_id": ObjectId(id)}, {"$set": {"status": status["status"]}})
+    return {"success": True}
 
-    # 3. Mettre à jour le stock (Décrémenter)
-    db.products.update_one(
-        {"_id": ObjectId(order.productId)},
-        {"$inc": {"stock": -order.quantity}}
-    )
-    
-    return {"success": True, "id": str(res.inserted_id)}
-
-@app.get("/api/orders/my")
-def my_orders(userId: str):
-    return [fix_id(o) for o in db.orders.find({"userId": userId})]
-
-
-
-
-# --- ROUTES PARAMÈTRES (Pour la bannière pub) ---
+# --- 9. ROUTES SETTINGS (Bannière Pub) ---
 @app.get("/api/settings")
 def get_settings():
-    # On cherche les réglages, s'ils n'existent pas, on en crée par défaut
     settings = db.settings.find_one({"_id": "global_settings"})
     if not settings:
-        return {"bannerText": "Bienvenue sur PROTEL Shop ! Livraison offerte dès 50.000F 🚚"}
+        return {"bannerText": "Bienvenue sur TKB SHOP !"}
     return {"bannerText": settings.get("bannerText")}
 
 @app.post("/api/settings")
 def update_settings(s: SiteSettings):
-    # On met à jour le texte (upsert=True signifie "crée si ça n'existe pas")
     db.settings.update_one(
         {"_id": "global_settings"}, 
         {"$set": {"bannerText": s.bannerText}}, 
@@ -227,35 +274,35 @@ def update_settings(s: SiteSettings):
     )
     return {"success": True}
 
-# --- ROUTES ADMIN ---
-
-@app.get("/api/admin/users")
-def get_users():
-    return [fix_id(u) for u in db.users.find({}, {"password": 0})]
-
-@app.get("/api/admin/orders")
-def all_orders():
-    orders = []
-    for o in db.orders.find():
-        # On récupère le nom du client pour l'afficher
-        u = db.users.find_one({"_id": ObjectId(o["userId"])})
-        o["userName"] = u["name"] if u else "Client Inconnu"
-        orders.append(fix_id(o))
-    return orders
-
-@app.put("/api/orders/{id}/status")
-def set_order_status(id: str, s: OrderStatus):
-    # Changer le statut (ex: "Expédié")
-    db.orders.update_one({"_id": ObjectId(id)}, {"$set": {"status": s.status}})
-    return {"success": True}
-
+# --- 10. ROUTES ADMIN (STATS & USERS) ---
 @app.get("/api/admin/stats")
-def stats():
-    # Calcul du chiffre d'affaires
-    total_revenue = sum(o.get("totalPrice", 0) for o in db.orders.find())
+def get_stats():
+    # Calcul revenu total (somme des commandes payées ou livrées)
+    pipeline = [
+        {"$match": {"status": {"$in": ["Livré", "Payé", "En préparation"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$totalPrice"}}}
+    ]
+    revenue_data = list(db.orders.aggregate(pipeline))
+    revenue = revenue_data[0]["total"] if revenue_data else 0
+
     return {
-        "revenue": total_revenue,
-        "usersCount": db.users.count_documents({}),
+        "revenue": revenue, 
+        "usersCount": db.users.count_documents({}), 
         "productsCount": db.products.count_documents({}),
         "ordersCount": db.orders.count_documents({})
     }
+
+@app.get("/api/admin/users")
+def get_users():
+    users = []
+    for u in db.users.find():
+        u["id"] = str(u["_id"])
+        del u["_id"]
+        if "password" in u: del u["password"]
+        users.append(u)
+    return users
+
+@app.delete("/api/admin/users/{id}")
+def delete_user(id: str):
+    db.users.delete_one({"_id": ObjectId(id)})
+    return {"success": True}

@@ -1,74 +1,70 @@
 from pymongo import MongoClient
 
-# 1. On se connecte à ton MongoDB local
+# 1. Connexion au MongoDB Local
 try:
     client = MongoClient("mongodb://localhost:27017")
-    print("✅ Connecté à MongoDB !")
+    print("✅ Connecté au PC Local (MongoDB) !")
 except Exception as e:
-    print(f"❌ Erreur de connexion : {e}")
+    print(f"❌ Erreur : {e}")
     exit()
 
-# 2. On crée (ou sélectionne) la base de données
-db = client.protel_travel
+# 2. Sélection de la base E-COMMERCE
+db = client.protel_shop
 
-# 3. On vide tout pour recommencer à zéro (propre)
-db.offers.delete_many({})
-db.users.delete_many({})
-db.reservations.delete_many({})
-print("🗑️  Base de données nettoyée.")
+# 3. Nettoyage (On vide les produits et commandes, mais on garde les users si tu veux)
+db.products.delete_many({})
+db.orders.delete_many({})
+# db.users.delete_many({}) # Décommente si tu veux aussi supprimer les utilisateurs
+print("🗑️  Anciens produits supprimés.")
 
-# 4. On prépare les offres (Voyages)
-offers_data = [
+# 4. Préparation des Produits (Mode / Sacs)
+products_data = [
   {
-    "title": "Villa Suspendue",
-    "location": "Bali, Indonésie",
-    "type": "accommodation",
-    "price": 250,
-    "rating": 4.9,
-    "image": "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?auto=format&fit=crop&q=80&w=800",
-    "description": "Une villa incroyable au-dessus de la jungle avec piscine privée.",
-    "status": "Active"
+    "name": "Sac Michael Kors Blanc",
+    "category": "Sac",
+    "price": 100,
+    "oldPrice": 200,
+    "stock": 7,
+    "image": "https://encrypted-tbn3.gstatic.com/shopping?q=tbn:ANd9GcR_k81JjC8Pj38jP_Gj5aX99H5-5J59595959", # Mets une vraie URL d'image valide si celle-ci casse
+    "description": "Sac à main élégant pour les soirées.",
+    "status": "Active",
+    "colors": ["#FFFFFF", "#000000", "#D4A373"] # Blanc, Noir, Beige
   },
   {
-    "title": "Plongée Nocturne",
-    "location": "Maldives",
-    "type": "activity",
-    "price": 85,
-    "rating": 4.7,
-    "image": "https://images.unsplash.com/photo-1544551763-46a8723ba3f9?auto=format&fit=crop&q=80&w=600",
-    "description": "Explorez les fonds marins avec des guides experts.",
-    "status": "Active"
+    "name": "Escarpins Rouges",
+    "category": "Chaussure",
+    "price": 45000,
+    "oldPrice": 60000,
+    "stock": 12,
+    "image": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=800",
+    "description": "Talons hauts confortables et vernis.",
+    "status": "Active",
+    "colors": ["#EF4444", "#000000"] # Rouge, Noir
   },
   {
-    "title": "Jet Privé (Vol Partagé)",
-    "location": "Paris -> Nice",
-    "type": "transport",
-    "price": 450,
-    "rating": 5.0,
-    "image": "https://images.unsplash.com/photo-1540962351504-03099e0a754b?auto=format&fit=crop&q=80&w=600",
-    "description": "Voyagez en classe affaires exclusive.",
-    "status": "Active"
+    "name": "Sac à dos Cuir",
+    "category": "Sac",
+    "price": 35000,
+    "oldPrice": None,
+    "stock": 5,
+    "image": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?q=80&w=800",
+    "description": "Parfait pour le travail et les voyages.",
+    "status": "Active",
+    "colors": ["#78350F"] # Marron
   },
   {
-    "title": "Cabane dans les arbres",
-    "location": "Costa Rica",
-    "type": "accommodation",
-    "price": 120,
-    "rating": 4.8,
-    "image": "https://images.unsplash.com/photo-1488415032361-b7e238421f1b?auto=format&fit=crop&q=80&w=600",
-    "status": "Active"
-  },
-  {
-    "title": "Safari 4x4",
-    "location": "Kenya",
-    "type": "transport",
-    "price": 180,
-    "rating": 4.6,
-    "image": "https://images.unsplash.com/photo-1539635278303-d4002c07eae3?auto=format&fit=crop&q=80&w=600",
-    "status": "Active"
+    "name": "Montre Or Rose",
+    "category": "Accessoire",
+    "price": 15000,
+    "oldPrice": 25000,
+    "stock": 20,
+    "image": "https://images.unsplash.com/photo-1513116476489-76db1a780648?q=80&w=800",
+    "description": "Accessoire indispensable pour briller.",
+    "status": "Active",
+    "colors": ["#FFD700", "#C0C0C0"] # Or, Argent
   }
 ]
 
-# 5. On insère les données
-db.offers.insert_many(offers_data)
-print(f"🎉 {len(offers_data)} offres ajoutées dans la base de données !")
+# 5. Insertion
+db.products.insert_many(products_data)
+print(f"🎉 {len(products_data)} produits ajoutés dans 'protel_shop' !")
