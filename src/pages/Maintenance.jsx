@@ -40,7 +40,7 @@ const Maintenance = ({ onBypass }) => {
                 onClick={onBypass}
                 className="mt-12 text-slate-300 hover:text-slate-900 text-xs font-sans flex items-center gap-2 transition-colors cursor-pointer"
             >
-                <Lock size={12} /> Accès Équipe Technique
+                <Lock size={12} />
             </button>
 
         </div>
