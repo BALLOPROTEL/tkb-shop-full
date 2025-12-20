@@ -38,7 +38,7 @@ const Maintenance = ({ onBypass }) => {
             {/* BOUTON SECRET (Pour toi uniquement) */}
             <button
                 onClick={onBypass}
-                className="mt-12 text-xs font-sans flex items-center gap-2 transition-colors cursor-pointer"
+                className="mt-12 text-slate-300 bg-[#fff0f5] text-xs font-sans flex items-center gap-2 transition-colors cursor-pointer"
             >
                 <Lock size={12} />
             </button>
