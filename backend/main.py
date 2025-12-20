@@ -117,45 +117,47 @@ class SiteSettings(BaseModel):
 
 # --- 6. ROUTES AUTHENTIFICATION (Le Coeur du système) ---
 
+# ROUTE REGISTER MODIFIÉE (On attend l'envoi de l'email AVANT de sauvegarder)
 @app.post("/api/auth/register")
-async def register(user: UserRegister, background_tasks: BackgroundTasks):
-    # 1. Vérifier si l'email existe déjà
+async def register(user: UserRegister): # On enlève BackgroundTasks pour tester en direct
+    # A. Vérifier si user existe
     if db.users.find_one({"email": user.email}):
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
-    # 2. Générer un code OTP (6 chiffres)
+    # B. Générer Code
     otp_code = str(random.randint(100000, 999999))
 
-    # 3. Préparer l'email
+    # C. Préparer Email
     message = MessageSchema(
-        subject="Votre code TKB SHOP",
+        subject="Code de vérification TKB SHOP",
         recipients=[user.email],
-        body=f"Bienvenue {user.name} ! <br> Votre code de validation est : <strong>{otp_code}</strong>",
+        body=f"Votre code est : <strong>{otp_code}</strong>",
         subtype=MessageType.html
     )
 
-    # 4. Envoyer l'email (Tâche de fond pour ne pas ralentir le site)
+    # D. TENTATIVE D'ENVOI (Bloquante pour être sûr que ça marche)
+    fm = FastMail(conf)
     try:
-        fm = FastMail(conf)
-        background_tasks.add_task(fm.send_message, message)
+        await fm.send_message(message) # On utilise await, pas background task
     except Exception as e:
-        print(f"Erreur Email: {e}")
-        # On continue quand même, mais idéalement il faudrait gérer l'erreur
+        print(f"ERREUR EMAIL CRITIQUE: {e}")
+        # SI L'EMAIL PLANTE, ON ARRÊTE TOUT. On n'enregistre PAS l'utilisateur.
+        raise HTTPException(status_code=500, detail="Impossible d'envoyer l'email. Vérifiez l'adresse.")
 
-    # 5. Sauvegarder l'utilisateur (Non vérifié)
+    # E. Sauvegarder SEULEMENT si l'email est parti
     hashed_pw = get_password_hash(user.password)
     user_dict = {
         "name": user.name,
         "email": user.email,
         "password": hashed_pw,
         "role": "client",
-        "isVerified": False, # <--- Bloqué tant que pas validé
+        "isVerified": False,
         "otpCode": otp_code,
         "createdAt": datetime.now()
     }
     db.users.insert_one(user_dict)
 
-    return {"success": True, "message": "Code envoyé par email !"}
+    return {"success": True, "message": "Code envoyé !"}
 
 @app.post("/api/auth/verify")
 async def verify_account(data: VerifyOTP):
