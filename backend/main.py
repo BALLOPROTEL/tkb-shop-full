@@ -50,7 +50,7 @@ conf = ConnectionConfig(
     MAIL_STARTTLS=False,        # <--- CHANGEMENT : On désactive STARTTLS
     MAIL_SSL_TLS=True,          # <--- CHANGEMENT : On active SSL (Force)
     USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
+    VALIDATE_CERTS=True,
     TIMEOUT=60 # On attend jusqu'à 60 secondes !
 )
 # --- 3. CONNEXION DB ---
