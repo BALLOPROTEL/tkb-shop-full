@@ -225,8 +225,8 @@ const ProductCard = ({ product, addToCart }) => {
                 </h3>
 
                 <div className="flex items-center gap-3 mt-1 mb-2">
-                    <span className="font-bold text-slate-900">{product.price.toLocaleString()} F</span>
-                    {isPromo && <span className="text-xs text-gray-400 line-through">{product.oldPrice.toLocaleString()} F</span>}
+                    <span className="font-bold text-slate-900">{product.price.toLocaleString()} F CFA</span>
+                    {isPromo && <span className="text-xs text-gray-400 line-through">{product.oldPrice.toLocaleString()} F CFA</span>}
                 </div>
 
                 <div className="flex gap-2">

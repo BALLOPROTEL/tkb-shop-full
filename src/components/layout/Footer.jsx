@@ -18,7 +18,7 @@ const Footer = () => {
                             <Truck size={32} strokeWidth={1} className="text-slate-800" />
                             <div>
                                 <h3 className="text-lg font-light text-slate-900 uppercase tracking-widest mb-2">Livraison Gratuite</h3>
-                                <p className="text-sm text-slate-500 font-light">Dès 100.000 FCFA partout en Afrique</p>
+                                <p className="text-sm text-slate-500 font-light">Dès 5000 FCFA partout à Abidjan et dès 2000 F CFA à Abengourou.</p>
                             </div>
                         </div>
 
@@ -36,7 +36,7 @@ const Footer = () => {
                             <CreditCard size={32} strokeWidth={1} className="text-slate-800" />
                             <div>
                                 <h3 className="text-lg font-light text-slate-900 uppercase tracking-widest mb-2">Paiement Sécurisé</h3>
-                                <p className="text-sm text-slate-500 font-light">Wave, Orange Money, Carte Bancaire</p>
+                                <p className="text-sm text-slate-500 font-light">Wave, Orange Money, MTN Money, Moov Money, PayPal, Carte Bancaire</p>
                             </div>
                         </div>
 
@@ -113,13 +113,15 @@ const Footer = () => {
                             <a href="#" className="text-white hover:text-pink-400"><Twitter size={20} /></a>
                         </div>
 
-                        <p className="text-gray-600 text-xs font-light">© 2025 PROTEL Shop. Réalisé avec passion.</p>
+                        <p className="text-gray-600 text-xs font-light">© 2025 TKB, Tous droits réservés. Réalisé avec passion.</p>
 
                         <div className="flex gap-3 text-gray-500">
                             {/* Simulation de logos de paiement avec des icônes */}
                             <CreditCard size={24} />
                             <div className="font-bold text-xs border border-gray-600 px-1 rounded flex items-center">VISA</div>
                             <div className="font-bold text-xs border border-gray-600 px-1 rounded flex items-center">OM</div>
+                            <div className="font-bold text-xs border border-gray-600 px-1 rounded flex items-center">Wave</div>
+                            <div className="font-bold text-xs border border-gray-600 px-1 rounded flex items-center">MoMo</div>
                         </div>
 
                     </div>

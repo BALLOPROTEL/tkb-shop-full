@@ -22,7 +22,7 @@ const Checkout = () => {
         address: '', city: '', phone: '', paymentMethod: 'online'
     });
 
-    const shippingCost = cartTotal > 100000 ? 0 : 2000;
+    const shippingCost = cartTotal > 5000 ? 0 : 2000;
     const finalTotal = cartTotal + shippingCost;
     const user = JSON.parse(localStorage.getItem('user'));
 
@@ -168,7 +168,7 @@ const Checkout = () => {
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
                                     <p className="text-sm text-slate-500 mb-3">Paiement Mobile & Carte</p>
                                     <div className="flex justify-center items-center gap-4 flex-wrap opacity-80">
-                                        <span className="font-bold text-orange-500">OM</span>
+                                        <span className="font-bold text-orange-500">Orange</span>
                                         <span className="font-bold text-yellow-500">MTN</span>
                                         <span className="font-bold text-cyan-500">Wave</span>
                                         <span className="font-bold text-slate-700">VISA</span>
@@ -180,7 +180,7 @@ const Checkout = () => {
                                 onClick={handlePaymentClick}
                                 className="w-full bg-green-600 text-white font-bold py-4 rounded-xl mt-6 hover:bg-green-500 shadow-xl shadow-green-200 transition-all active:scale-95 flex justify-center items-center gap-2"
                             >
-                                Payer {finalTotal.toLocaleString()} F maintenant
+                                Payer {finalTotal.toLocaleString()} F CFA maintenant
                             </button>
                         </div>
                     </div>
@@ -198,7 +198,7 @@ const Checkout = () => {
                                         <p className="font-bold text-slate-900">{item.name}</p>
                                         <p className="text-slate-500">Qté: {item.quantity}</p>
                                     </div>
-                                    <p className="font-bold text-slate-700">{(item.price * item.quantity).toLocaleString()} F</p>
+                                    <p className="font-bold text-slate-700">{(item.price * item.quantity).toLocaleString()} F CFA</p>
                                 </div>
                             ))}
                         </div>
@@ -206,15 +206,15 @@ const Checkout = () => {
                         <div className="border-t border-slate-200 mt-6 pt-4 space-y-2">
                             <div className="flex justify-between text-slate-600">
                                 <span>Sous-total</span>
-                                <span>{cartTotal.toLocaleString()} F</span>
+                                <span>{cartTotal.toLocaleString()} F CFA</span>
                             </div>
                             <div className="flex justify-between text-slate-600">
                                 <span>Livraison</span>
-                                <span>{shippingCost.toLocaleString()} F</span>
+                                <span>{shippingCost.toLocaleString()} F CFA</span>
                             </div>
                             <div className="flex justify-between text-xl font-extrabold text-slate-900 pt-2">
                                 <span>Total à payer</span>
-                                <span>{finalTotal.toLocaleString()} F</span>
+                                <span>{finalTotal.toLocaleString()} F CFA</span>
                             </div>
                         </div>
                     </div>

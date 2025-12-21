@@ -127,7 +127,7 @@ const MyOrders = () => {
                 <div className="flex justify-between items-center pt-4 border-t border-slate-50">
                   <div className="flex flex-col">
                     <span className="text-xs text-slate-400 uppercase font-bold">Total</span>
-                    <span className="font-bold text-slate-900">{order.totalPrice?.toLocaleString()} FCFA</span>
+                    <span className="font-bold text-slate-900">{order.totalPrice?.toLocaleString()} F CFA</span>
                   </div>
                   <button className="text-sm font-bold text-slate-500 hover:text-slate-900 underline">
                     Voir détails

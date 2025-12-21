@@ -101,10 +101,10 @@ const ProductDetails = () => {
                             </div>
 
                             <div className="flex items-end gap-4 mb-6">
-                                <span className="text-3xl font-bold text-pink-600">{product.price.toLocaleString()} F</span>
+                                <span className="text-3xl font-bold text-pink-600">{product.price.toLocaleString()} F CFA</span>
                                 {hasDiscount && (
                                     <span className="text-xl text-slate-400 line-through mb-1 decoration-slate-300">
-                                        {product.oldPrice.toLocaleString()} F
+                                        {product.oldPrice.toLocaleString()} F CFA
                                     </span>
                                 )}
                             </div>

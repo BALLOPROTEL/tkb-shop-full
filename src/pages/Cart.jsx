@@ -7,8 +7,8 @@ const Cart = () => {
     const { cart, removeFromCart, updateQuantity, cartTotal } = useCart();
     const navigate = useNavigate();
 
-    // Frais de livraison (Simulés : Gratuit si > 100.000 F)
-    const shippingCost = cartTotal > 100000 ? 0 : 2000;
+    // Frais de livraison (Simulés : Gratuit si > 5.000 F CFA, sinon 2.000 F CFA)
+    const shippingCost = cartTotal > 5000 ? 0 : 2000;
     const finalTotal = cartTotal + shippingCost;
 
     // Si le panier est vide
@@ -76,8 +76,8 @@ const Cart = () => {
 
                                         {/* Prix Total Item */}
                                         <div className="text-right">
-                                            <p className="text-xs text-slate-400">Prix unitaire: {item.price.toLocaleString()} F</p>
-                                            <p className="font-bold text-blue-600 text-xl">{(item.price * item.quantity).toLocaleString()} F</p>
+                                            <p className="text-xs text-slate-400">Prix unitaire: {item.price.toLocaleString()} F CFA</p>
+                                            <p className="font-bold text-blue-600 text-xl">{(item.price * item.quantity).toLocaleString()} F CFA</p>
                                         </div>
                                     </div>
                                 </div>
@@ -97,17 +97,17 @@ const Cart = () => {
                             <div className="space-y-4 mb-8 border-b border-slate-100 pb-8">
                                 <div className="flex justify-between text-slate-600">
                                     <span>Sous-total</span>
-                                    <span>{cartTotal.toLocaleString()} F</span>
+                                    <span>{cartTotal.toLocaleString()} F CFA</span>
                                 </div>
                                 <div className="flex justify-between text-slate-600">
                                     <span>Livraison</span>
-                                    <span>{shippingCost === 0 ? <span className="text-green-500 font-bold">Gratuit</span> : `${shippingCost} F`}</span>
+                                    <span>{shippingCost === 0 ? <span className="text-green-500 font-bold">Gratuit</span> : `${shippingCost} F CFA`}</span>
                                 </div>
                             </div>
 
                             <div className="flex justify-between items-center mb-8">
                                 <span className="text-lg font-bold text-slate-900">Total</span>
-                                <span className="text-3xl font-extrabold text-blue-600">{finalTotal.toLocaleString()} F</span>
+                                <span className="text-3xl font-extrabold text-blue-600">{finalTotal.toLocaleString()} F CFA</span>
                             </div>
 
                             {/* BOUTON COMMANDER AVEC NAVIGATION */}

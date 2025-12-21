@@ -134,9 +134,9 @@ const Home = () => {
                             <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">{product.category}</p>
                             <h3 className="font-bold text-slate-900 text-lg mb-1 leading-tight group-hover:text-pink-600 transition-colors line-clamp-1">{product.name}</h3>
                             <div className="flex items-center gap-2">
-                                <span className="text-pink-600 font-extrabold text-lg">{product.price.toLocaleString()} F</span>
+                                <span className="text-pink-600 font-extrabold text-lg">{product.price.toLocaleString()} F CFA</span>
                                 {product.oldPrice && (
-                                    <span className="text-slate-300 line-through text-sm">{product.oldPrice.toLocaleString()} F</span>
+                                    <span className="text-slate-300 line-through text-sm">{product.oldPrice.toLocaleString()} F CFA</span>
                                 )}
                             </div>
                         </div>
