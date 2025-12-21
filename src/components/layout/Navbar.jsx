@@ -105,7 +105,7 @@ const Navbar = ({ onOpenAuth }) => {
                                     {isProfileMenuOpen && (
                                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-pink-100 overflow-hidden py-1 animate-in fade-in slide-in-from-top-2">
                                             {user.role === 'admin' && <Link to="/admin" onClick={closeMenu} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-pink-50 text-slate-700"><Package size={16} /> Admin</Link>}
-                                            <Link to="/user-profile" onClick={closeMenu} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-pink-50 text-slate-700"><User size={16} /> Profil</Link>
+                                            <Link to="/profile" onClick={closeMenu} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-pink-50 text-slate-700"><User size={16} /> Profil</Link>
                                             <Link to="/my-orders" onClick={closeMenu} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-pink-50 text-slate-700"><Package size={16} /> Commandes</Link>
                                             <div className="border-t my-1"></div>
                                             <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50"><LogOut size={16} /> Déconnexion</button>
@@ -147,7 +147,7 @@ const Navbar = ({ onOpenAuth }) => {
                             {user ? (
                                 <div className="space-y-3">
                                     {/* CARTE PROFIL CLIQUABLE */}
-                                    <Link to="/user-profile" onClick={closeMenu} className="flex items-center gap-3 mb-6 bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95 border border-slate-100">
+                                    <Link to="/profile" onClick={closeMenu} className="flex items-center gap-3 mb-6 bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95 border border-slate-100">
                                         <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xl font-bold border-2 border-white shadow-sm">
                                             {user.name.charAt(0).toUpperCase()}
                                         </div>
