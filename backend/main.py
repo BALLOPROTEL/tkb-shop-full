@@ -14,12 +14,11 @@ from datetime import datetime
 app = FastAPI()
 
 # --- 1. SÉCURITÉ CORS (RESTREINTE) ---
-# Seuls ton PC et ton site Vercel ont le droit de parler au Backend
 origins = [
-    "http://localhost:5173",       # Ton Frontend Local
+    "http://localhost:5173",       
     "http://127.0.0.1:5173",
-    "https://tkb-shop-full.vercel.app", # <--- TON LIEN VERCEL (Sans slash à la fin)
-    "https://tkb-shop-full.vercel.app/" # (Avec slash, au cas où)
+    "https://tkb-shop-full.vercel.app", 
+    "https://tkb-shop-full.vercel.app/"
 ]
 
 app.add_middleware(
@@ -30,39 +29,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 2. CONFIGURATION EMAIL (OBLIGATOIRE POUR L'INSCRIPTION) ---
 # --- 2. CONFIGURATION EMAIL (SÉCURISÉE) ---
-# On récupère les infos depuis Render (Environment Variables)
 MAIL_USERNAME = os.getenv("MAIL_USERNAME")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 
-# Vérification de sécurité (pour les logs)
-if not MAIL_USERNAME or not MAIL_PASSWORD:
-    print("⚠️ ATTENTION : Identifiants Email non configurés sur le serveur !")
-
-# --- CONFIGURATION EMAIL MODIFIÉE (PORT 465 SSL) ---
+# Configuration pour Gmail (Port 465 SSL avec Timeout augmenté)
 conf = ConnectionConfig(
     MAIL_USERNAME=MAIL_USERNAME,
     MAIL_PASSWORD=MAIL_PASSWORD,
     MAIL_FROM=MAIL_USERNAME,
-    MAIL_PORT=587,              # <--- CHANGEMENT : On passe au port 465
+    MAIL_PORT=465,              
     MAIL_SERVER="smtp.gmail.com",
-    MAIL_STARTTLS=False,        # <--- CHANGEMENT : On désactive STARTTLS
-    MAIL_SSL_TLS=True,          # <--- CHANGEMENT : On active SSL (Force)
+    MAIL_STARTTLS=False,        
+    MAIL_SSL_TLS=True,          
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True,
-    TIMEOUT=60 # On attend jusqu'à 60 secondes !
+    TIMEOUT=30 # Timeout 30 secondes
 )
+
 # --- 3. CONNEXION DB ---
 mongo_uri = os.getenv("MONGO_URI")
 if not mongo_uri:
-    # Mode Local (PC)
     client = MongoClient("mongodb://127.0.0.1:27017")
 else:
-    # Mode Cloud (Render)
     client = MongoClient(mongo_uri)
 
-# On force l'utilisation de la base 'protel_shop'
 db = client.get_database("protel_shop")
 
 # --- 4. SÉCURITÉ & HASHAGE ---
@@ -116,11 +107,10 @@ class Order(BaseModel):
 class SiteSettings(BaseModel):
     bannerText: str
 
-# --- 6. ROUTES AUTHENTIFICATION (Le Coeur du système) ---
+# --- 6. ROUTES AUTHENTIFICATION (ROBUSTE) ---
 
-# ROUTE REGISTER MODIFIÉE (On attend l'envoi de l'email AVANT de sauvegarder)
 @app.post("/api/auth/register")
-async def register(user: UserRegister): # On enlève BackgroundTasks pour tester en direct
+async def register(user: UserRegister): 
     # A. Vérifier si user existe
     if db.users.find_one({"email": user.email}):
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
@@ -136,16 +126,21 @@ async def register(user: UserRegister): # On enlève BackgroundTasks pour tester
         subtype=MessageType.html
     )
 
-    # D. TENTATIVE D'ENVOI (Bloquante pour être sûr que ça marche)
+    # D. TENTATIVE D'ENVOI (MODE ROBUSTE)
     fm = FastMail(conf)
+    email_sent = False
+    
     try:
-        await fm.send_message(message) # On utilise await, pas background task
+        await fm.send_message(message)
+        email_sent = True
     except Exception as e:
-        print(f"ERREUR EMAIL CRITIQUE: {e}")
-        # SI L'EMAIL PLANTE, ON ARRÊTE TOUT. On n'enregistre PAS l'utilisateur.
-        raise HTTPException(status_code=500, detail="Impossible d'envoyer l'email. Vérifiez l'adresse.")
+        # SI L'EMAIL PLANTE, ON LOGGUE LE CODE SECRET POUR L'ADMIN
+        print(f"⚠️ ÉCHEC ENVOI EMAIL : {e}")
+        print(f"🔑 CODE SECRET DE SECOURS (À COPIER) : {otp_code}") 
+        print(f"🔑 CODE SECRET DE SECOURS (À COPIER) : {otp_code}")
+        # On continue l'inscription quand même !
 
-    # E. Sauvegarder SEULEMENT si l'email est parti
+    # E. Sauvegarder l'utilisateur
     hashed_pw = get_password_hash(user.password)
     user_dict = {
         "name": user.name,
@@ -158,7 +153,11 @@ async def register(user: UserRegister): # On enlève BackgroundTasks pour tester
     }
     db.users.insert_one(user_dict)
 
-    return {"success": True, "message": "Code envoyé !"}
+    if email_sent:
+        return {"success": True, "message": "Code envoyé par email !"}
+    else:
+        # Message discret pour l'utilisateur, mais l'inscription a marché
+        return {"success": True, "message": "Compte créé. Vérifiez vos emails (ou contactez le support)."}
 
 @app.post("/api/auth/verify")
 async def verify_account(data: VerifyOTP):
@@ -186,7 +185,7 @@ def login(user: UserLogin):
     
     # Bloquer si le compte n'est pas vérifié
     if db_user.get("isVerified") == False:
-         raise HTTPException(status_code=400, detail="Compte non vérifié. Vérifiez vos emails.")
+         raise HTTPException(status_code=400, detail="Compte non vérifié. Entrez le code reçu.")
 
     return {"success": True, "user": _format_user(db_user)}
 
@@ -247,8 +246,11 @@ def get_all_orders():
         o["id"] = str(o["_id"])
         del o["_id"]
         # On essaie de récupérer le nom du client
-        user = db.users.find_one({"_id": ObjectId(o["userId"])})
-        o["userName"] = user["name"] if user else "Inconnu"
+        try:
+            user = db.users.find_one({"_id": ObjectId(o["userId"])})
+            o["userName"] = user["name"] if user else "Inconnu"
+        except:
+            o["userName"] = "Client supprimé"
         orders.append(o)
     return orders
 
