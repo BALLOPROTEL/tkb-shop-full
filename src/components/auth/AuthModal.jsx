@@ -1,24 +1,31 @@
-import React, { useState } from 'react';
-import { X, Mail, Lock, User, Loader, CheckCircle, Square, CheckSquare, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Mail, Lock, User, Loader, CheckSquare, ArrowLeft, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { API_BASE_URL } from '../../config';
 
 const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
-    // Modes : 'login', 'register', 'verify' (inscription), 'forgot', 'reset' (nouveau mdp)
     const [mode, setMode] = useState(initialMode);
     const [loading, setLoading] = useState(false);
-    const [isHuman, setIsHuman] = useState(false); // Captcha maison
+    const [isHuman, setIsHuman] = useState(false);
 
     const [formData, setFormData] = useState({
         name: '', email: '', password: '', otp: '', newPassword: ''
     });
+
+    // --- C'EST ICI QUE LA MAGIE OPÈRE (CORRECTION DU BUG) ---
+    useEffect(() => {
+        if (isOpen) {
+            setMode(initialMode); // On force le mode demandé (login ou register)
+            setIsHuman(false);    // On décoche le captcha
+            setFormData({ name: '', email: '', password: '', otp: '', newPassword: '' }); // On vide les champs
+        }
+    }, [isOpen, initialMode]);
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Vérification CAPTCHA (Uniquement pour Register et Login)
         if ((mode === 'register' || mode === 'login') && !isHuman) {
             toast.error("Veuillez cocher la case 'Je ne suis pas un robot'");
             return;
@@ -28,7 +35,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
         let endpoint = '';
         let body = {};
 
-        // CONFIGURATION DES ROUTES
         if (mode === 'login') {
             endpoint = '/api/auth/login';
             body = { email: formData.email, password: formData.password };
@@ -66,7 +72,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                     setMode('login');
                     setIsHuman(false);
                 } else {
-                    // Login ou Verify succès
                     toast.success("Bienvenue !");
                     localStorage.setItem('user', JSON.stringify(data.user));
                     window.location.reload();
@@ -82,7 +87,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
         }
     };
 
-    // Titres dynamiques
     const getTitle = () => {
         if (mode === 'login') return 'Connexion';
         if (mode === 'register') return 'Inscription';
@@ -113,7 +117,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                             </div>
                         )}
 
-                        {/* Email (Partout sauf Reset où on l'a déjà) */}
                         {(mode !== 'reset' && mode !== 'verify') && (
                             <div className="relative">
                                 <Mail className="absolute left-4 top-3.5 text-slate-400" size={20} />
@@ -121,7 +124,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                             </div>
                         )}
 
-                        {/* Password (Login, Register) */}
                         {(mode === 'login' || mode === 'register') && (
                             <div className="relative">
                                 <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
@@ -129,7 +131,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                             </div>
                         )}
 
-                        {/* Code OTP (Verify, Reset) */}
                         {(mode === 'verify' || mode === 'reset') && (
                             <div className="text-center">
                                 <p className="text-xs text-slate-500 mb-2">Code envoyé à {formData.email}</p>
@@ -140,7 +141,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                             </div>
                         )}
 
-                        {/* Nouveau Password (Reset) */}
                         {mode === 'reset' && (
                             <div className="relative">
                                 <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
@@ -148,7 +148,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                             </div>
                         )}
 
-                        {/* CAPTCHA MAISON (Checkbox) - Uniquement pour Login/Register */}
                         {(mode === 'login' || mode === 'register') && (
                             <div
                                 onClick={() => setIsHuman(!isHuman)}
@@ -167,14 +166,12 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                         </button>
                     </form>
 
-                    {/* Liens bas de page */}
                     <div className="mt-6 text-center space-y-2">
                         {mode === 'login' && (
                             <button onClick={() => setMode('forgot')} className="text-sm text-slate-500 hover:text-slate-900 underline">
                                 Mot de passe oublié ?
                             </button>
                         )}
-
                         {(mode === 'login' || mode === 'register') && (
                             <p className="text-sm text-slate-500">
                                 {mode === 'login' ? "Pas de compte ?" : "Déjà membre ?"}

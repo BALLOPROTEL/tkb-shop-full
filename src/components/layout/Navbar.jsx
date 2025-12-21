@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, ShoppingBag, ShoppingCart, ChevronDown, Package } from 'lucide-react';
+import { Menu, X, User, LogOut, ShoppingBag, ShoppingCart, ChevronDown, Package, Instagram, Facebook, Twitter } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { API_BASE_URL } from '../../config';
 
 const Navbar = ({ onOpenAuth }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -12,7 +13,6 @@ const Navbar = ({ onOpenAuth }) => {
 
     const navigate = useNavigate();
     const { cartCount } = useCart();
-    const API_URL = "https://tkb-shop.onrender.com";
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -21,7 +21,7 @@ const Navbar = ({ onOpenAuth }) => {
         const handleScroll = () => setIsScrolled(window.scrollY > 40);
         window.addEventListener('scroll', handleScroll);
 
-        fetch(`${API_URL}/api/settings`)
+        fetch(`${API_BASE_URL}/api/settings`)
             .then(res => res.json())
             .then(data => setBannerText(data.bannerText || "Bienvenue !"))
             .catch(err => console.error(err));
@@ -51,14 +51,14 @@ const Navbar = ({ onOpenAuth }) => {
 
     return (
         <>
-            {/* BANDEAU PUB (Reste relative z-50) */}
+            {/* BANDEAU PUB */}
             <div className="bg-pink-500 text-white text-xs font-bold py-2 overflow-hidden relative z-50">
                 <div className="whitespace-nowrap animate-marquee flex gap-10">
                     <span>{bannerText}</span><span>•</span><span>{bannerText}</span><span>•</span><span>{bannerText}</span>
                 </div>
             </div>
 
-            {/* NAVBAR (Modifié : sticky au lieu de fixed) */}
+            {/* NAVBAR DESKTOP & MOBILE HEADER */}
             <nav className={`sticky top-0 w-full z-40 transition-all duration-300 ${isScrolled
                 ? 'bg-white/95 backdrop-blur-md shadow-md py-3 text-slate-900'
                 : 'bg-[#fff0f5] py-4 text-slate-800'
@@ -66,12 +66,10 @@ const Navbar = ({ onOpenAuth }) => {
                 <div className="container mx-auto px-6 flex justify-between items-center">
 
                     {/* LOGO */}
-                    {/* LOGO MODIFIÉ */}
                     <Link to="/" className="text-xl font-extrabold flex items-center gap-2 tracking-tighter z-50 relative">
                         <div className={`p-1.5 rounded-lg transition-colors ${isScrolled ? 'bg-pink-600 text-white' : 'bg-slate-900 text-pink-200'}`}>
                             <ShoppingBag size={20} />
                         </div>
-                        {/* TEXTE CHANGÉ ICI */}
                         <span className="font-serif tracking-wide">TKB<span className="text-pink-600">_SHOP</span></span>
                     </Link>
 
@@ -86,7 +84,6 @@ const Navbar = ({ onOpenAuth }) => {
 
                     {/* ZONE DROITE */}
                     <div className="flex items-center gap-4">
-
                         <Link to="/cart" className="relative hover:text-pink-600 transition-colors">
                             <ShoppingCart size={24} />
                             {cartCount > 0 && (
@@ -127,44 +124,81 @@ const Navbar = ({ onOpenAuth }) => {
                     </div>
                 </div>
 
-                {/* --- MENU MOBILE (OVERLAY CORRIGÉ) --- */}
-                {/* z-[60] pour passer devant la pub qui est z-50 */}
+                {/* --- MENU MOBILE (OVERLAY CORRIGÉ & REDESIGNÉ) --- */}
                 {isOpen && (
-                    <div className="fixed inset-0 top-0 left-0 w-full h-screen bg-white z-[60] flex flex-col pt-24 px-6 animate-in slide-in-from-top-10 duration-300">
-                        {/* Bouton fermer en haut à droite (sécurité) */}
-                        <button className="absolute top-6 right-6 p-2 bg-slate-100 rounded-full" onClick={closeMenu}>
+                    <div className="fixed inset-0 top-0 left-0 w-full h-screen bg-white z-[60] flex flex-col pt-24 animate-in slide-in-from-top-10 duration-300">
+                        {/* Bouton fermer sécurité */}
+                        <button className="absolute top-6 right-6 p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors" onClick={closeMenu}>
                             <X size={24} />
                         </button>
 
-                        <div className="flex flex-col gap-6 text-xl font-serif font-bold text-slate-900">
+                        {/* Liens de navigation */}
+                        <div className="flex flex-col gap-2 px-6 overflow-y-auto flex-grow">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Menu</p>
                             {navLinks.map((link) => (
-                                <a key={link.name} href={link.href} onClick={closeMenu} className="border-b border-slate-100 pb-2 hover:text-pink-600">
+                                <a key={link.name} href={link.href} onClick={closeMenu} className="text-2xl font-serif font-bold text-slate-900 py-3 border-b border-slate-50 hover:text-pink-600 transition-colors">
                                     {link.name}
                                 </a>
                             ))}
                         </div>
 
-                        <div className="mt-8 pt-8 border-t border-slate-100">
+                        {/* Section Utilisateur / Connexion (FOOTER DU MENU) */}
+                        <div className="mt-auto bg-slate-50 border-t border-slate-200 p-6 pb-10">
                             {user ? (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-lg font-bold">{user.name.charAt(0).toUpperCase()}</div>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-3 mb-6 bg-white p-4 rounded-xl shadow-sm">
+                                        <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xl font-bold">{user.name.charAt(0).toUpperCase()}</div>
                                         <div>
-                                            <p className="font-bold text-slate-900">Bonjour, {user.name}</p>
+                                            <p className="font-bold text-slate-900 text-lg">Bonjour, {user.name}</p>
                                             <p className="text-xs text-slate-500">Membre privilège</p>
                                         </div>
                                     </div>
-                                    <Link to="/profile" onClick={closeMenu} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-pink-50"><User size={20} /> Mon Profil</Link>
-                                    <Link to="/my-orders" onClick={closeMenu} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-pink-50"><Package size={20} /> Mes Commandes</Link>
-                                    {user.role === 'admin' && <Link to="/admin" onClick={closeMenu} className="flex items-center gap-3 p-3 bg-slate-900 text-white rounded-xl"><Package size={20} /> Espace Admin</Link>}
-                                    <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-red-500 hover:bg-red-50 rounded-xl mt-2"><LogOut size={20} /> Déconnexion</button>
+                                    <Link to="/my-orders" onClick={closeMenu} className="flex items-center justify-between p-4 bg-white rounded-xl font-medium text-slate-700 shadow-sm active:scale-95 transition-all">
+                                        <span>📦 Mes Commandes</span>
+                                        <ChevronDown size={16} className="-rotate-90 text-slate-400" />
+                                    </Link>
+                                    {user.role === 'admin' && (
+                                        <Link to="/admin" onClick={closeMenu} className="flex items-center justify-between p-4 bg-slate-900 text-white rounded-xl font-medium shadow-lg active:scale-95 transition-all">
+                                            <span>👑 Espace Admin</span>
+                                            <ChevronDown size={16} className="-rotate-90 text-slate-400" />
+                                        </Link>
+                                    )}
+                                    <button onClick={handleLogout} className="w-full py-4 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors">Se déconnecter</button>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button onClick={() => { onOpenAuth('login'); closeMenu(); }} className="py-3 border border-slate-200 rounded-xl font-bold">Connexion</button>
-                                    <button onClick={() => { onOpenAuth('register'); closeMenu(); }} className="py-3 bg-slate-900 text-white rounded-xl font-bold">Inscription</button>
+                                <div className="space-y-4">
+                                    <p className="text-center text-sm text-slate-500 mb-2">Connectez-vous pour accéder à votre espace</p>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {/* BOUTON CONNEXION (NOIR) */}
+                                        <button
+                                            onClick={() => { onOpenAuth('login'); closeMenu(); }}
+                                            className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2"
+                                        >
+                                            <User size={18} /> Se connecter
+                                        </button>
+
+                                        {/* BOUTON INSCRIPTION (ROSE) */}
+                                        <button
+                                            onClick={() => { onOpenAuth('register'); closeMenu(); }}
+                                            className="w-full py-4 bg-pink-600 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2"
+                                        >
+                                            Créer un compte
+                                        </button>
+                                    </div>
                                 </div>
                             )}
+
+                            {/* MINI FOOTER INTEGRÉ */}
+                            <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center gap-4">
+                                <div className="flex gap-6 text-slate-400">
+                                    <Instagram size={20} className="hover:text-pink-600 transition-colors" />
+                                    <Facebook size={20} className="hover:text-blue-600 transition-colors" />
+                                    <Twitter size={20} className="hover:text-blue-400 transition-colors" />
+                                </div>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">
+                                    © 2025 TKB_SHOP • Tous droits réservés
+                                </p>
+                            </div>
                         </div>
                     </div>
                 )}
