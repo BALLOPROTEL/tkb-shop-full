@@ -8,6 +8,7 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import MyOrders from './pages/MyOrders';
 import UserProfile from './pages/UserProfile';
+import PaymentSuccess from './pages/PaymentSuccess';
 import AuthModal from './components/auth/AuthModal';
 import ScrollToTop from './components/layout/ScrollToTop'; // <--- IMPORT ICI
 import { CartProvider } from './context/CartContext';
@@ -73,6 +74,7 @@ const AppContent = () => {
           <Route path="/products/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/my-orders" element={<MyOrders />} />
           <Route path="/profile" element={<UserProfile />} />
 

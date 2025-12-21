@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { Package, Truck, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../config'; // <--- IMPORT CONFIG (Plus pro)
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // URL API
-  const API_URL = "https://tkb-shop.onrender.com";
 
   useEffect(() => {
     fetchOrders();
@@ -16,7 +13,7 @@ const AdminOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/orders`);
+      const res = await fetch(`${API_BASE_URL}/api/admin/orders`);
       if (res.ok) {
         const data = await res.json();
         // On trie pour avoir les plus récentes en haut
@@ -33,7 +30,7 @@ const AdminOrders = () => {
   // Fonction pour changer le statut (ex: valider une commande)
   const updateStatus = async (id, newStatus) => {
     try {
-      const res = await fetch(`${API_URL}/api/orders/${id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -55,57 +52,58 @@ const AdminOrders = () => {
     }
   };
 
+  // ⚠️ NOTE IMPORTANTE : PAS DE <AdminLayout> ICI !
+  // C'est App.jsx qui s'en occupe. Ici on retourne juste le contenu.
   return (
-    <AdminLayout>
+    <div className="p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Package className="text-blue-500" /> Gestion des Commandes
+        <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+          <Package className="text-blue-600" /> Gestion des Commandes
         </h1>
-        <p className="text-slate-400">Suivez et gérez les achats des clients.</p>
+        <p className="text-slate-500">Suivez et gérez les achats des clients.</p>
       </div>
 
-      <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-        {/* 👇 AJOUTE CETTE DIV POUR LE SCROLL */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
-            <thead className="bg-slate-900 text-slate-400 uppercase text-xs">
+            <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
               <tr>
-                <th className="p-4">ID</th>
-                <th className="p-4">Client</th>
-                <th className="p-4">Produit</th>
-                <th className="p-4">Total</th>
-                <th className="p-4">Adresse</th>
-                <th className="p-4">Statut</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-4 border-b">ID</th>
+                <th className="p-4 border-b">Client</th>
+                <th className="p-4 border-b">Produit</th>
+                <th className="p-4 border-b">Total</th>
+                <th className="p-4 border-b">Adresse</th>
+                <th className="p-4 border-b">Statut</th>
+                <th className="p-4 border-b text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700">
+            <tbody className="divide-y divide-slate-100 text-sm">
               {loading ? (
-                <tr><td colSpan="7" className="p-8 text-center">Chargement...</td></tr>
+                <tr><td colSpan="7" className="p-10 text-center text-slate-500">Chargement...</td></tr>
               ) : orders.length === 0 ? (
-                <tr><td colSpan="7" className="p-8 text-center">Aucune commande pour le moment.</td></tr>
+                <tr><td colSpan="7" className="p-10 text-center text-slate-500">Aucune commande pour le moment.</td></tr>
               ) : (
                 orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-700/50 transition-colors">
-                    <td className="p-4 font-mono text-xs text-slate-500">#{order.id.slice(-6)}</td>
-                    <td className="p-4 font-bold text-white">{order.userName || "Inconnu"}</td>
+                  <tr key={order.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 font-mono text-slate-400">#{order.id.slice(-6)}</td>
+                    <td className="p-4 font-bold text-slate-900">{order.userName || "Inconnu"}</td>
                     <td className="p-4">
-                      <div className="font-medium text-white">{order.productName}</div>
+                      <div className="font-bold text-slate-800">{order.productName}</div>
                       <div className="text-xs text-slate-500">Qté: {order.quantity}</div>
                     </td>
-                    <td className="p-4 font-bold text-blue-400">{(order.totalPrice || order.price).toLocaleString()} F</td>
-                    <td className="p-4 text-xs max-w-[200px] truncate" title={order.address}>{order.address}</td>
+                    <td className="p-4 font-bold text-blue-600">{(order.totalPrice || order.price).toLocaleString()} F</td>
+                    <td className="p-4 text-slate-500 max-w-[200px] truncate" title={order.address}>{order.address}</td>
                     <td className="p-4">{getStatusBadge(order.status)}</td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
                         {order.status !== 'Livré' && (
-                          <button onClick={() => updateStatus(order.id, 'Livré')} className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500 hover:text-white" title="Marquer comme Livré">
-                            <Truck size={16} />
+                          <button onClick={() => updateStatus(order.id, 'Livré')} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="Marquer comme Livré">
+                            <Truck size={18} />
                           </button>
                         )}
                         {order.status !== 'Annulé' && (
-                          <button onClick={() => updateStatus(order.id, 'Annulé')} className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500 hover:text-white" title="Annuler">
-                            <XCircle size={16} />
+                          <button onClick={() => updateStatus(order.id, 'Annulé')} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors" title="Annuler">
+                            <XCircle size={18} />
                           </button>
                         )}
                       </div>
@@ -117,7 +115,7 @@ const AdminOrders = () => {
           </table>
         </div>
       </div>
-    </AdminLayout>
+    </div>
   );
 };
 

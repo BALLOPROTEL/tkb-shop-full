@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { MapPin, Phone, CreditCard, CheckCircle, ArrowLeft, Loader } from 'lucide-react';
+import { MapPin, Phone, CreditCard, CheckCircle, ArrowLeft, Loader, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import PaymentModal from '../components/common/PaymentModal'; // <--- Import du simulateur
+import PaymentModal from '../components/common/PaymentModal';
+import { API_BASE_URL } from '../config';
+// 👇 1. On importe la fenêtre de connexion
+import AuthModal from '../components/auth/AuthModal';
 
 const Checkout = () => {
     const { cart, cartTotal, clearCart } = useCart();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
-    const [showPaymentModal, setShowPaymentModal] = useState(false); // État pour ouvrir le popup
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-    const API_URL = "https://tkb-shop.onrender.com";
+    // 👇 2. État pour ouvrir la connexion directement ici
+    const [showLoginModal, setShowLoginModal] = useState(false);
 
     const [formData, setFormData] = useState({
         address: '', city: '', phone: '', paymentMethod: 'online'
@@ -26,33 +30,63 @@ const Checkout = () => {
         if (cart.length === 0 && !isSuccess) navigate('/');
     }, [cart, isSuccess, navigate]);
 
+    // --- GESTION UTILISATEUR NON CONNECTÉ ---
     if (!user) {
-        toast.error("Connexion requise");
-        navigate('/');
-        return null;
+        return (
+            <div className="min-h-screen bg-slate-50 pt-32 pb-20 px-6 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-lg text-center border border-slate-100">
+                    <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <User className="text-pink-600" size={32} />
+                    </div>
+                    <h2 className="text-2xl font-serif font-bold text-slate-900 mb-2">Connexion requise</h2>
+                    <p className="text-slate-500 mb-8">
+                        Pour sécuriser votre commande et suivre votre colis, vous devez être identifié.
+                    </p>
+
+                    {/* 👇 3. BOUTON QUI OUVRE LA FENÊTRE AU LIEU DE REDIRIGER */}
+                    <button
+                        onClick={() => setShowLoginModal(true)}
+                        className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-all"
+                    >
+                        Se connecter maintenant
+                    </button>
+
+                    {/* 👇 4. INTÉGRATION DU MODAL JUSTE POUR CETTE PAGE */}
+                    <AuthModal
+                        isOpen={showLoginModal}
+                        onClose={() => setShowLoginModal(false)}
+                        initialMode="login"
+                    />
+                </div>
+            </div>
+        );
     }
 
-    // Fonction appelée quand le simulateur dit "OK, c'est payé"
+    // ... (Le reste du code reste IDENTIQUE à avant) ...
+
     const handlePaymentSuccess = async () => {
-        setShowPaymentModal(false); // On ferme le popup
-        setLoading(true); // On affiche un chargement final
+        setShowPaymentModal(false);
+        setLoading(true);
 
         try {
             const transactionId = "TX-" + Math.floor(Math.random() * 100000000);
+            const userId = user.id || user._id;
+
+            if (!userId) throw new Error("ID Utilisateur introuvable");
 
             const orderPromises = cart.map(item => {
-                return fetch(`${API_URL}/api/orders`, {
+                return fetch(`${API_BASE_URL}/api/orders`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userId: user.id,
+                        userId: userId,
                         productId: item.id,
                         productName: item.name,
                         price: item.price,
                         quantity: item.quantity,
                         totalPrice: item.price * item.quantity,
                         address: `${formData.address}, ${formData.city} (Tél: ${formData.phone})`,
-                        status: 'Payé (Mobile Money)', // Statut clair pour l'admin
+                        status: 'Payé (Mobile Money)',
                         paymentId: transactionId
                     })
                 });
@@ -73,13 +107,11 @@ const Checkout = () => {
         }
     };
 
-    // Bouton Payer
     const handlePaymentClick = () => {
         if (!formData.address || !formData.city || !formData.phone) {
             toast.error("Veuillez remplir l'adresse et le téléphone");
             return;
         }
-        // Au lieu d'appeler CinetPay, on ouvre NOTRE modal
         setShowPaymentModal(true);
     };
 
@@ -189,7 +221,6 @@ const Checkout = () => {
 
                 </div>
 
-                {/* --- LE SIMULATEUR DE PAIEMENT --- */}
                 <PaymentModal
                     isOpen={showPaymentModal}
                     onClose={() => setShowPaymentModal(false)}
