@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { DollarSign, Users, ShoppingBag, PieChart as PieIcon, BarChart as BarIcon, Activity, Layers, Disc, Megaphone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { API_BASE_URL } from '../../config'; // <--- IMPORT CONFIG
+import { API_BASE_URL } from '../../config';
 
 const DashboardHome = () => {
     const [kpi, setKpi] = useState({ revenue: 0, usersCount: 0, productsCount: 0, ordersCount: 0 });
@@ -30,9 +30,9 @@ const DashboardHome = () => {
                     const ordersData = await ordersRes.json();
                     if (Array.isArray(ordersData)) {
                         const distribution = [
-                            { name: 'Livré', value: ordersData.filter(o => o.status === 'Livré').length, fill: '#22c55e' },
-                            { name: 'En cours', value: ordersData.filter(o => o.status === 'En préparation' || o.status === 'En attente').length, fill: '#eab308' },
-                            { name: 'Annulé', value: ordersData.filter(o => o.status === 'Annulé').length, fill: '#ef4444' },
+                            { name: 'Livré', value: ordersData.filter(o => o.status === 'Livré').length, fill: '#22c55e' }, // Green
+                            { name: 'En cours', value: ordersData.filter(o => o.status === 'En préparation' || o.status === 'En attente').length, fill: '#eab308' }, // Yellow
+                            { name: 'Annulé', value: ordersData.filter(o => o.status === 'Annulé').length, fill: '#ef4444' }, // Red
                         ];
                         setGraphData(distribution);
                     }
@@ -71,7 +71,8 @@ const DashboardHome = () => {
 
     const renderChart = () => {
         const commonProps = { width: "100%", height: "100%" };
-        const tooltipStyle = { backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#1e293b', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' };
+        // Tooltip sombre pour le mode dark
+        const tooltipStyle = { backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)' };
 
         if (!graphData || graphData.length === 0) return null;
 
@@ -80,10 +81,10 @@ const DashboardHome = () => {
                 return (
                     <ResponsiveContainer {...commonProps}>
                         <BarChart data={graphData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                            <XAxis dataKey="name" stroke="#64748b" />
-                            <YAxis stroke="#64748b" allowDecimals={false} />
-                            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f1f5f9' }} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" allowDecimals={false} />
+                            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                             <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={60}>
                                 {graphData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                             </Bar>
@@ -94,9 +95,9 @@ const DashboardHome = () => {
                 return (
                     <ResponsiveContainer {...commonProps}>
                         <LineChart data={graphData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                            <XAxis dataKey="name" stroke="#64748b" />
-                            <YAxis stroke="#64748b" allowDecimals={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" allowDecimals={false} />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} dot={{ r: 6 }} activeDot={{ r: 8 }} />
                         </LineChart>
@@ -106,9 +107,9 @@ const DashboardHome = () => {
                 return (
                     <ResponsiveContainer {...commonProps}>
                         <AreaChart data={graphData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                            <XAxis dataKey="name" stroke="#64748b" />
-                            <YAxis stroke="#64748b" allowDecimals={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <XAxis dataKey="name" stroke="#94a3b8" />
+                            <YAxis stroke="#94a3b8" allowDecimals={false} />
                             <Tooltip contentStyle={tooltipStyle} />
                             <Area type="monotone" dataKey="value" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} />
                         </AreaChart>
@@ -119,7 +120,7 @@ const DashboardHome = () => {
                     <ResponsiveContainer {...commonProps}>
                         <RadialBarChart cx="50%" cy="50%" innerRadius="10%" outerRadius="80%" barSize={20} data={graphData}>
                             <RadialBar minAngle={15} label={{ position: 'insideStart', fill: '#fff' }} background clockWise dataKey="value" />
-                            <Legend iconSize={10} layout="vertical" verticalAlign="middle" wrapperStyle={{ right: 0 }} />
+                            <Legend iconSize={10} layout="vertical" verticalAlign="middle" wrapperStyle={{ right: 0, color: '#94a3b8' }} />
                             <Tooltip contentStyle={tooltipStyle} />
                         </RadialBarChart>
                     </ResponsiveContainer>
@@ -133,7 +134,7 @@ const DashboardHome = () => {
                                 {graphData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                             </Pie>
                             <Tooltip contentStyle={tooltipStyle} />
-                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                            <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ color: '#94a3b8' }} />
                         </PieChart>
                     </ResponsiveContainer>
                 );
@@ -142,61 +143,61 @@ const DashboardHome = () => {
 
     // ⚠️ PAS DE <AdminLayout> ICI !
     return (
-        <div className="p-6">
+        <div className="p-6 bg-slate-900 min-h-screen text-slate-200">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 mb-1">Tableau de Bord</h1>
-                <p className="text-slate-500">Suivi de votre boutique en temps réel.</p>
+                <h1 className="text-3xl font-bold text-white mb-1">Tableau de Bord</h1>
+                <p className="text-slate-400">Suivi de votre boutique en temps réel.</p>
             </div>
 
-            {/* --- CONFIG BANNIÈRE --- */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-sm">
+            {/* --- CONFIG BANNIÈRE (Dark) --- */}
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 mb-8 flex flex-col md:flex-row gap-4 items-end shadow-lg">
                 <div className="flex-1 w-full">
-                    <label className="text-slate-500 text-sm mb-2 block flex items-center gap-2 font-bold uppercase">
-                        <Megaphone size={16} className="text-pink-600" /> Message de la bannière (Haut du site)
+                    <label className="text-slate-400 text-sm mb-2 block flex items-center gap-2 font-bold uppercase">
+                        <Megaphone size={16} className="text-pink-500" /> Message de la bannière (Haut du site)
                     </label>
                     <input
                         type="text"
                         value={bannerText}
                         onChange={(e) => setBannerText(e.target.value)}
                         placeholder="Ex: 🔥 SOLDES D'ÉTÉ : -50% sur tout le site !"
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition-all"
+                        className="w-full bg-slate-900 border border-slate-600 text-white rounded-xl p-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition-all placeholder:text-slate-600"
                     />
                 </div>
                 <button
                     onClick={saveBanner}
-                    className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-pink-200 active:scale-95 whitespace-nowrap"
+                    className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-pink-900/20 active:scale-95 whitespace-nowrap"
                 >
                     Mettre à jour
                 </button>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards (Dark) */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-white border border-slate-200 p-6 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
-                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Revenus</p><h3 className="text-2xl font-bold text-slate-900 mt-1">{kpi.revenue ? kpi.revenue.toLocaleString() : 0} F</h3></div>
-                    <div className="p-3 bg-green-50 text-green-600 rounded-xl"><DollarSign size={24} /></div>
+                <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex justify-between items-center shadow-lg hover:bg-slate-750 transition-colors">
+                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Revenus</p><h3 className="text-2xl font-bold text-white mt-1">{kpi.revenue ? kpi.revenue.toLocaleString() : 0} F</h3></div>
+                    <div className="p-3 bg-green-500/10 text-green-400 rounded-xl"><DollarSign size={24} /></div>
                 </div>
-                <div className="bg-white border border-slate-200 p-6 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
-                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Clients</p><h3 className="text-2xl font-bold text-slate-900 mt-1">{kpi.usersCount || 0}</h3></div>
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={24} /></div>
+                <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex justify-between items-center shadow-lg hover:bg-slate-750 transition-colors">
+                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Clients</p><h3 className="text-2xl font-bold text-white mt-1">{kpi.usersCount || 0}</h3></div>
+                    <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl"><Users size={24} /></div>
                 </div>
-                <div className="bg-white border border-slate-200 p-6 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
-                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Produits</p><h3 className="text-2xl font-bold text-slate-900 mt-1">{kpi.productsCount || 0}</h3></div>
-                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><ShoppingBag size={24} /></div>
+                <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex justify-between items-center shadow-lg hover:bg-slate-750 transition-colors">
+                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Produits</p><h3 className="text-2xl font-bold text-white mt-1">{kpi.productsCount || 0}</h3></div>
+                    <div className="p-3 bg-purple-500/10 text-purple-400 rounded-xl"><ShoppingBag size={24} /></div>
                 </div>
-                <div className="bg-white border border-slate-200 p-6 rounded-2xl flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
-                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Commandes</p><h3 className="text-2xl font-bold text-slate-900 mt-1">{kpi.ordersCount || 0}</h3></div>
-                    <div className="p-3 bg-orange-50 text-orange-600 rounded-xl"><Activity size={24} /></div>
+                <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex justify-between items-center shadow-lg hover:bg-slate-750 transition-colors">
+                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Commandes</p><h3 className="text-2xl font-bold text-white mt-1">{kpi.ordersCount || 0}</h3></div>
+                    <div className="p-3 bg-orange-500/10 text-orange-400 rounded-xl"><Activity size={24} /></div>
                 </div>
             </div>
 
-            {/* Graph Section */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 h-[500px] flex flex-col shadow-sm">
+            {/* Graph Section (Dark) */}
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-[500px] flex flex-col shadow-lg">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 className="text-slate-900 font-bold text-lg flex items-center gap-2"><PieIcon size={20} className="text-blue-600" /> Analyse des Ventes</h3>
+                    <h3 className="text-white font-bold text-lg flex items-center gap-2"><PieIcon size={20} className="text-blue-500" /> Analyse des Ventes</h3>
 
                     {/* Chart Selector */}
-                    <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700">
                         {[
                             { id: 'line', icon: Activity, label: 'Ligne' },
                             { id: 'pie', icon: PieIcon, label: 'Cercle' },
@@ -208,8 +209,8 @@ const DashboardHome = () => {
                                 key={type.id}
                                 onClick={() => setChartType(type.id)}
                                 className={`p-2 rounded-md transition-all flex items-center gap-2 text-sm font-medium ${chartType === type.id
-                                    ? 'bg-white text-blue-600 shadow-sm font-bold'
-                                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+                                    ? 'bg-blue-600 text-white shadow-lg'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
                                     }`}
                                 title={type.label}
                             >
@@ -222,11 +223,11 @@ const DashboardHome = () => {
 
                 <div className="flex-1 w-full min-h-0">
                     {loading ? (
-                        <div className="flex items-center justify-center h-full text-slate-400 animate-pulse">Chargement des données...</div>
+                        <div className="flex items-center justify-center h-full text-slate-500 animate-pulse">Chargement des données...</div>
                     ) : graphData.length > 0 && graphData.some(d => d.value > 0) ? (
                         renderChart()
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                        <div className="flex flex-col items-center justify-center h-full text-slate-500">
                             <PieIcon size={48} className="mb-4 opacity-20" />
                             <p>Aucune commande pour le moment.</p>
                             <p className="text-sm opacity-60">Les statistiques apparaîtront dès la première vente.</p>
