@@ -216,15 +216,23 @@ def create_product(p: Product): result = db.products.insert_one(p.dict()); retur
 def update_product(id: str, p: Product): db.products.update_one({"_id": ObjectId(id)}, {"$set": p.dict(exclude_unset=True)}); return {"success": True}
 @app.delete("/api/products/{id}")
 def delete_product(id: str): db.products.delete_one({"_id": ObjectId(id)}); return {"success": True}
+
 @app.get("/api/admin/orders")
 def get_orders():
     orders = []
+    # Tri par date de création décroissante (du plus récent au plus ancien)
     for o in db.orders.find().sort("createdAt", -1):
         o["id"] = str(o["_id"]); del o["_id"]
-        try: u = db.users.find_one({"_id": ObjectId(o["userId"])}); o["userName"] = u["name"] if u else "Inconnu"
-        except: o["userName"] = "Inconnu"
+        try: 
+            if ObjectId.is_valid(o["userId"]):
+                u = db.users.find_one({"_id": ObjectId(o["userId"])})
+                o["userName"] = u["name"] if u else "Inconnu"
+            else:
+                o["userName"] = "ID Invalide"
+        except: o["userName"] = "Erreur"
         orders.append(o)
     return orders
+
 @app.post("/api/orders")
 def create_order(o: Order): result = db.orders.insert_one(o.dict()); return {"success": True}
 @app.put("/api/orders/{id}/status")
@@ -233,9 +241,63 @@ def update_status(id: str, status: dict): db.orders.update_one({"_id": ObjectId(
 def get_set(): s = db.settings.find_one({"_id": "global_settings"}); return {"bannerText": s.get("bannerText") if s else "Bienvenue !"}
 @app.post("/api/settings")
 def up_set(s: SiteSettings): db.settings.update_one({"_id": "global_settings"}, {"$set": {"bannerText": s.bannerText}}, upsert=True); return {"success": True}
+
 @app.get("/api/admin/stats")
-def stats(): return {"revenue": 0, "usersCount": 0, "productsCount": 0, "ordersCount": 0}
+def get_stats():
+    try:
+        # Calcul du revenu amélioré (accepte plusieurs statuts de paiement)
+        pipeline = [
+            {
+                "$match": {
+                    "status": {
+                        "$in": [
+                            "Livré", 
+                            "Payé", 
+                            "En préparation", 
+                            "Payé (Mobile Money)", 
+                            "Payé (Carte Bancaire)"
+                        ]
+                    }
+                }
+            },
+            {"$group": {"_id": None, "total": {"$sum": "$totalPrice"}}}
+        ]
+        revenue_data = list(db.orders.aggregate(pipeline))
+        revenue = revenue_data[0]["total"] if revenue_data else 0
+
+        return {
+            "revenue": revenue, 
+            "usersCount": db.users.count_documents({}), 
+            "productsCount": db.products.count_documents({}),
+            "ordersCount": db.orders.count_documents({})
+        }
+    except Exception as e:
+        print(f"Erreur Stats: {e}")
+        return {"revenue": 0, "usersCount": 0, "productsCount": 0, "ordersCount": 0}
+
 @app.get("/api/admin/users")
-def users(): return []
+def get_users():
+    try:
+        users = []
+        for u in db.users.find():
+            try:
+                # Protection contre les documents malformés
+                u["id"] = str(u["_id"])
+                del u["_id"]
+                if "password" in u: del u["password"]
+                users.append(u)
+            except Exception as e:
+                print(f"Erreur sur un utilisateur spécifique: {e}")
+                continue 
+        return users
+    except Exception as e:
+        print(f"Erreur globale Users: {e}")
+        return []
+
 @app.delete("/api/admin/users/{id}")
-def del_user(id: str): db.users.delete_one({"_id": ObjectId(id)}); return {"success": True}
+def delete_user(id: str): 
+    try:
+        db.users.delete_one({"_id": ObjectId(id)})
+        return {"success": True}
+    except:
+        raise HTTPException(status_code=400, detail="ID Invalide")
