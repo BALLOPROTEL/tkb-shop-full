@@ -80,7 +80,7 @@ const AppContent = () => {
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/my-orders" element={<MyOrders />} />
-          <Route path="/profile" element={<UserProfile />} /> {/* <--- ROUTE AJOUTÉE */}
+          <Route path="/user-profile" element={<UserProfile />} /> {/* <--- ROUTE AJOUTÉE */}
 
           {/* ADMIN */}
           <Route path="/admin" element={<AdminLayout><DashboardHome /></AdminLayout>} />
