@@ -1,14 +1,14 @@
-from fastapi import FastAPI, HTTPException, Depends, status, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from pymongo import MongoClient
 from bson import ObjectId
 from passlib.context import CryptContext
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from fastapi.security import OAuth2PasswordBearer
 import os
 import random
+import httpx # On utilise httpx pour parler à l'API Brevo
 from datetime import datetime
 
 app = FastAPI()
@@ -29,26 +29,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 2. CONFIGURATION EMAIL (BREVO / SMTP) ---
-MAIL_USERNAME = os.getenv("MAIL_USERNAME")
-MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
-MAIL_SERVER = "smtp-relay.brevo.com" # Serveur Brevo
-MAIL_PORT = 587
-
-if not MAIL_USERNAME or not MAIL_PASSWORD:
-    print("⚠️ ATTENTION : Variables email manquantes sur Render")
-
-conf = ConnectionConfig(
-    MAIL_USERNAME=MAIL_USERNAME,
-    MAIL_PASSWORD=MAIL_PASSWORD,
-    MAIL_FROM="no-reply@tkb-shop.com", # Tu peux mettre ce que tu veux ici
-    MAIL_PORT=MAIL_PORT,
-    MAIL_SERVER=MAIL_SERVER,
-    MAIL_STARTTLS=True,  # Brevo utilise STARTTLS sur le port 587
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
-)
+# --- 2. CONFIGURATION BREVO API ---
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 # --- 3. CONNEXION DB ---
 mongo_uri = os.getenv("MONGO_URI")
@@ -83,75 +66,62 @@ class VerifyOTP(BaseModel):
     email: EmailStr
     otp: str
 
-# Reste des modèles (Product, Order...) inchangés, je les abrège pour la clarté
+# Modèles simplifiés pour la lisibilité (Product, Order, etc. restent les mêmes)
 class Product(BaseModel):
-    id: Optional[str] = None
-    name: str
-    category: str
-    price: float
-    oldPrice: Optional[float] = None
-    stock: int
-    image: str
-    description: Optional[str] = None
-    status: str = "Active"
-    colors: List[str] = []
-
+    id: Optional[str] = None; name: str; category: str; price: float; oldPrice: Optional[float] = None; stock: int; image: str; description: Optional[str] = None; status: str = "Active"; colors: List[str] = []
 class Order(BaseModel):
-    userId: str
-    productId: str
-    productName: str
-    price: float
-    quantity: int
-    totalPrice: float
-    address: str
-    status: str = "En préparation"
-    paymentId: Optional[str] = None
-    createdAt: datetime = Field(default_factory=datetime.now)
-
+    userId: str; productId: str; productName: str; price: float; quantity: int; totalPrice: float; address: str; status: str = "En préparation"; paymentId: Optional[str] = None; createdAt: datetime = Field(default_factory=datetime.now)
 class SiteSettings(BaseModel):
     bannerText: str
 
-# --- 6. ROUTES AUTHENTIFICATION (LE VRAI SYSTÈME) ---
+# --- 6. ROUTES AUTHENTIFICATION (API BREVO) ---
+
+async def send_email_via_api(email, name, code):
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+    payload = {
+        "sender": {"name": "TKB SHOP", "email": "no-reply@tkb-shop.com"},
+        "to": [{"email": email, "name": name}],
+        "subject": "Votre code de validation TKB SHOP",
+        "htmlContent": f"<html><body><h1>Bienvenue {name} !</h1><p>Votre code est : <strong>{code}</strong></p></body></html>"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(BREVO_URL, json=payload, headers=headers)
+        if response.status_code not in [200, 201, 202]:
+            raise Exception(f"Erreur API Brevo: {response.text}")
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
-    # 1. Vérifier si l'email existe
+    # 1. Vérif existant
     if db.users.find_one({"email": user.email}):
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
-    # 2. Générer Code
+    # 2. Code OTP
     otp_code = str(random.randint(100000, 999999))
 
-    # 3. Préparer Email
-    message = MessageSchema(
-        subject="Code de validation TKB SHOP",
-        recipients=[user.email],
-        body=f"""
-        <h1>Bienvenue chez TKB SHOP !</h1>
-        <p>Votre code de vérification est :</p>
-        <h2 style='color: #db2777;'>{otp_code}</h2>
-        <p>Ce code expire dans 10 minutes.</p>
-        """,
-        subtype=MessageType.html
-    )
-
-    # 4. Envoyer via Brevo
-    fm = FastMail(conf)
+    # 3. Envoi via API HTTP (Pas de SMTP qui bloque !)
     try:
-        await fm.send_message(message)
+        if BREVO_API_KEY:
+            await send_email_via_api(user.email, user.name, otp_code)
+        else:
+            print(f"⚠️ Pas de clé API Brevo. Code de secours : {otp_code}")
     except Exception as e:
-        print(f"ERREUR EMAIL: {e}")
-        # Cette fois, si Brevo échoue, c'est grave. On prévient l'user.
+        print(f"ERREUR ENVOI EMAIL: {e}")
+        # Si l'API échoue, on prévient (mais l'API est très stable)
         raise HTTPException(status_code=500, detail="Erreur d'envoi d'email. Vérifiez votre adresse.")
 
-    # 5. Sauvegarder User (Non vérifié)
+    # 4. Sauvegarde
     hashed_pw = get_password_hash(user.password)
     user_dict = {
         "name": user.name,
         "email": user.email,
         "password": hashed_pw,
         "role": "client",
-        "isVerified": False, # On bloque tant que pas validé
+        "isVerified": False,
         "otpCode": otp_code,
         "createdAt": datetime.now()
     }
@@ -162,48 +132,37 @@ async def register(user: UserRegister):
 @app.post("/api/auth/verify")
 async def verify_account(data: VerifyOTP):
     user = db.users.find_one({"email": data.email})
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
-    
-    if user.get("isVerified"):
-        return {"success": True, "message": "Compte déjà vérifié", "user": _format_user(user)}
+    if not user: raise HTTPException(404, "Utilisateur introuvable")
+    if user.get("isVerified"): return {"success": True, "message": "Déjà vérifié", "user": _format_user(user)}
 
     if user.get("otpCode") == data.otp:
         db.users.update_one({"email": data.email}, {"$set": {"isVerified": True, "otpCode": None}})
         return {"success": True, "user": _format_user(user)}
     else:
-        raise HTTPException(status_code=400, detail="Code incorrect !")
+        raise HTTPException(400, "Code incorrect !")
 
 @app.post("/api/auth/login")
 def login(user: UserLogin):
     db_user = db.users.find_one({"email": user.email})
-    
     if not db_user or not verify_password(user.password, db_user["password"]):
-        raise HTTPException(status_code=400, detail="Email ou mot de passe incorrect")
-    
+        raise HTTPException(400, "Email ou mot de passe incorrect")
     if db_user.get("isVerified") == False:
-         raise HTTPException(status_code=400, detail="Compte non vérifié. Regardez vos emails.")
-
+         raise HTTPException(400, "Compte non vérifié. Regardez vos emails.")
     return {"success": True, "user": _format_user(db_user)}
 
-# Helper
-def _format_user(user_data):
-    user_data["id"] = str(user_data["_id"])
-    del user_data["_id"]
-    if "password" in user_data: del user_data["password"]
-    if "otpCode" in user_data: del user_data["otpCode"]
-    return user_data
+def _format_user(u):
+    u["id"] = str(u["_id"]); del u["_id"]
+    if "password" in u: del u["password"]
+    if "otpCode" in u: del u["otpCode"]
+    return u
 
-# --- ROUTES CLASSIQUES (PRODUITS, ETC) ---
-# Je remets les routes de base pour que le fichier soit complet
+# --- AUTRES ROUTES (PRODUITS...) ---
+# (Elles sont identiques, je les remets rapidement pour que le fichier soit complet)
 @app.get("/api/products")
 def get_products():
-    products = []
-    for p in db.products.find():
-        p["id"] = str(p["_id"]); del p["_id"]; products.append(p)
+    products = []; 
+    for p in db.products.find(): p["id"] = str(p["_id"]); del p["_id"]; products.append(p)
     return products
-
 @app.get("/api/products/{id}")
 def get_product(id: str):
     try:
@@ -211,63 +170,32 @@ def get_product(id: str):
         if p: p["id"] = str(p["_id"]); del p["_id"]; return p
         raise HTTPException(404)
     except: raise HTTPException(404)
-
 @app.post("/api/products")
-def create_product(p: Product):
-    result = db.products.insert_one(p.dict())
-    return {"success": True, "id": str(result.inserted_id)}
-
+def create_product(p: Product): result = db.products.insert_one(p.dict()); return {"success": True, "id": str(result.inserted_id)}
 @app.put("/api/products/{id}")
-def update_product(id: str, p: Product):
-    db.products.update_one({"_id": ObjectId(id)}, {"$set": p.dict(exclude_unset=True)})
-    return {"success": True}
-
+def update_product(id: str, p: Product): db.products.update_one({"_id": ObjectId(id)}, {"$set": p.dict(exclude_unset=True)}); return {"success": True}
 @app.delete("/api/products/{id}")
-def delete_product(id: str):
-    db.products.delete_one({"_id": ObjectId(id)})
-    return {"success": True}
-
+def delete_product(id: str): db.products.delete_one({"_id": ObjectId(id)}); return {"success": True}
 @app.get("/api/admin/orders")
 def get_orders():
     orders = []
     for o in db.orders.find().sort("createdAt", -1):
         o["id"] = str(o["_id"]); del o["_id"]
-        try:
-            u = db.users.find_one({"_id": ObjectId(o["userId"])})
-            o["userName"] = u["name"] if u else "Inconnu"
+        try: u = db.users.find_one({"_id": ObjectId(o["userId"])}); o["userName"] = u["name"] if u else "Inconnu"
         except: o["userName"] = "Inconnu"
         orders.append(o)
     return orders
-
 @app.post("/api/orders")
-def create_order(o: Order):
-    result = db.orders.insert_one(o.dict())
-    return {"success": True}
-
+def create_order(o: Order): result = db.orders.insert_one(o.dict()); return {"success": True}
 @app.put("/api/orders/{id}/status")
-def update_status(id: str, status: dict):
-    db.orders.update_one({"_id": ObjectId(id)}, {"$set": {"status": status["status"]}})
-    return {"success": True}
-
+def update_status(id: str, status: dict): db.orders.update_one({"_id": ObjectId(id)}, {"$set": {"status": status["status"]}}); return {"success": True}
 @app.get("/api/settings")
-def get_set():
-    s = db.settings.find_one({"_id": "global_settings"})
-    return {"bannerText": s.get("bannerText") if s else "Bienvenue !"}
-
+def get_set(): s = db.settings.find_one({"_id": "global_settings"}); return {"bannerText": s.get("bannerText") if s else "Bienvenue !"}
 @app.post("/api/settings")
-def up_set(s: SiteSettings):
-    db.settings.update_one({"_id": "global_settings"}, {"$set": {"bannerText": s.bannerText}}, upsert=True)
-    return {"success": True}
-
+def up_set(s: SiteSettings): db.settings.update_one({"_id": "global_settings"}, {"$set": {"bannerText": s.bannerText}}, upsert=True); return {"success": True}
 @app.get("/api/admin/stats")
-def stats():
-    return {"revenue": 0, "usersCount": 0} # Simplifié pour l'exemple
-
+def stats(): return {"revenue": 0, "usersCount": 0, "productsCount": 0, "ordersCount": 0}
 @app.get("/api/admin/users")
-def users():
-    return []
-
+def users(): return []
 @app.delete("/api/admin/users/{id}")
-def del_user(id: str):
-    db.users.delete_one({"_id": ObjectId(id)})
-    return {"success": True}
+def del_user(id: str): db.users.delete_one({"_id": ObjectId(id)}); return {"success": True}
