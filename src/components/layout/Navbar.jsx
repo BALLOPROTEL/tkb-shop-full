@@ -52,13 +52,13 @@ const Navbar = ({ onOpenAuth }) => {
     return (
         <>
             {/* BANDEAU PUB */}
-            <div className="bg-pink-500 text-white text-xs font-bold py-2 overflow-hidden relative z-50">
+            <div className="bg-pink-600 text-white text-xs font-bold py-2 overflow-hidden relative z-50">
                 <div className="whitespace-nowrap animate-marquee flex gap-10">
                     <span>{bannerText}</span><span>•</span><span>{bannerText}</span><span>•</span><span>{bannerText}</span>
                 </div>
             </div>
 
-            {/* NAVBAR DESKTOP & MOBILE HEADER */}
+            {/* NAVBAR */}
             <nav className={`sticky top-0 w-full z-40 transition-all duration-300 ${isScrolled
                 ? 'bg-white/95 backdrop-blur-md shadow-md py-3 text-slate-900'
                 : 'bg-[#fff0f5] py-4 text-slate-800'
@@ -124,10 +124,10 @@ const Navbar = ({ onOpenAuth }) => {
                     </div>
                 </div>
 
-                {/* --- MENU MOBILE (OVERLAY CORRIGÉ & REDESIGNÉ) --- */}
+                {/* --- MENU MOBILE LUXE --- */}
                 {isOpen && (
                     <div className="fixed inset-0 top-0 left-0 w-full h-screen bg-white z-[60] flex flex-col pt-24 animate-in slide-in-from-top-10 duration-300">
-                        {/* Bouton fermer sécurité */}
+                        {/* Bouton fermer */}
                         <button className="absolute top-6 right-6 p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors" onClick={closeMenu}>
                             <X size={24} />
                         </button>
@@ -142,28 +142,39 @@ const Navbar = ({ onOpenAuth }) => {
                             ))}
                         </div>
 
-                        {/* Section Utilisateur / Connexion (FOOTER DU MENU) */}
+                        {/* ZONE UTILISATEUR (FOOTER DU MENU) */}
                         <div className="mt-auto bg-slate-50 border-t border-slate-200 p-6 pb-10">
                             {user ? (
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-3 mb-6 bg-white p-4 rounded-xl shadow-sm">
-                                        <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xl font-bold">{user.name.charAt(0).toUpperCase()}</div>
-                                        <div>
-                                            <p className="font-bold text-slate-900 text-lg">Bonjour, {user.name}</p>
-                                            <p className="text-xs text-slate-500">Membre privilège</p>
+                                    {/* CARTE PROFIL CLIQUABLE */}
+                                    <Link to="/UserProfile" onClick={closeMenu} className="flex items-center gap-3 mb-6 bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95 border border-slate-100">
+                                        <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xl font-bold border-2 border-white shadow-sm">
+                                            {user.name.charAt(0).toUpperCase()}
                                         </div>
-                                    </div>
+                                        <div>
+                                            <p className="font-bold text-slate-900 text-lg leading-tight">{user.name}</p>
+                                            <p className="text-xs text-pink-600 font-bold">Voir mon profil</p>
+                                        </div>
+                                        <div className="ml-auto bg-slate-100 p-2 rounded-full">
+                                            <User size={16} className="text-slate-400" />
+                                        </div>
+                                    </Link>
+
                                     <Link to="/my-orders" onClick={closeMenu} className="flex items-center justify-between p-4 bg-white rounded-xl font-medium text-slate-700 shadow-sm active:scale-95 transition-all">
                                         <span>📦 Mes Commandes</span>
                                         <ChevronDown size={16} className="-rotate-90 text-slate-400" />
                                     </Link>
+
                                     {user.role === 'admin' && (
                                         <Link to="/admin" onClick={closeMenu} className="flex items-center justify-between p-4 bg-slate-900 text-white rounded-xl font-medium shadow-lg active:scale-95 transition-all">
                                             <span>👑 Espace Admin</span>
                                             <ChevronDown size={16} className="-rotate-90 text-slate-400" />
                                         </Link>
                                     )}
-                                    <button onClick={handleLogout} className="w-full py-4 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors">Se déconnecter</button>
+
+                                    <button onClick={handleLogout} className="w-full py-4 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors mt-2">
+                                        Se déconnecter
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -188,12 +199,12 @@ const Navbar = ({ onOpenAuth }) => {
                                 </div>
                             )}
 
-                            {/* MINI FOOTER INTEGRÉ */}
+                            {/* MINI FOOTER INTEGRÉ (Réseaux Sociaux) */}
                             <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center gap-4">
                                 <div className="flex gap-6 text-slate-400">
-                                    <Instagram size={20} className="hover:text-pink-600 transition-colors" />
-                                    <Facebook size={20} className="hover:text-blue-600 transition-colors" />
-                                    <Twitter size={20} className="hover:text-blue-400 transition-colors" />
+                                    <Instagram size={20} className="hover:text-pink-600 transition-colors cursor-pointer" />
+                                    <Facebook size={20} className="hover:text-blue-600 transition-colors cursor-pointer" />
+                                    <Twitter size={20} className="hover:text-blue-400 transition-colors cursor-pointer" />
                                 </div>
                                 <p className="text-[10px] text-slate-400 uppercase tracking-widest">
                                     © 2025 TKB_SHOP • Tous droits réservés

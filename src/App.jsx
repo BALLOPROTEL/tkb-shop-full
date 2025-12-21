@@ -7,6 +7,7 @@ import ProductDetails from './pages/ProductDetails';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import MyOrders from './pages/MyOrders';
+import UserProfile from './pages/UserProfile'; // <--- AJOUT IMPORTANT
 import AuthModal from './components/auth/AuthModal';
 import { CartProvider } from './context/CartContext';
 import { Toaster } from 'react-hot-toast';
@@ -22,8 +23,9 @@ import AdminUsers from './pages/admin/AdminUsers';
 import Maintenance from './pages/Maintenance';
 
 // --- CONFIGURATION ---
-// Mets "true" pour activer la maintenance, "false" pour ouvrir au public
-const IS_MAINTENANCE_MODE = true;
+// 🔴 METTRE "true" pour fermer le site (Maintenance)
+// 🟢 METTRE "false" pour ouvrir le site au public (Live)
+const IS_MAINTENANCE_MODE = false;
 
 const AppContent = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -34,6 +36,7 @@ const AppContent = () => {
   // Vérifier si l'utilisateur a déjà le "Pass VIP" (stocké dans le navigateur)
   useEffect(() => {
     const hasBypass = localStorage.getItem('maintenance_bypass');
+    // Si on a le pass, on force l'affichage du site même si maintenance = true
     if (hasBypass) {
       setIsMaintenance(false);
     }
@@ -77,6 +80,7 @@ const AppContent = () => {
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/my-orders" element={<MyOrders />} />
+          <Route path="/profile" element={<UserProfile />} /> {/* <--- ROUTE AJOUTÉE */}
 
           {/* ADMIN */}
           <Route path="/admin" element={<AdminLayout><DashboardHome /></AdminLayout>} />
