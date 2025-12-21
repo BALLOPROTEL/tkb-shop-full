@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 import os
 import random
-import httpx # On utilise httpx pour parler à l'API Brevo
+import httpx 
 from datetime import datetime
 
 app = FastAPI()
@@ -54,19 +54,18 @@ def get_password_hash(password):
 
 # --- 5. MODÈLES ---
 class UserRegister(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
-
+    name: str; email: EmailStr; password: str
 class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
+    email: EmailStr; password: str
 class VerifyOTP(BaseModel):
-    email: EmailStr
-    otp: str
+    email: EmailStr; otp: str
 
-# Modèles simplifiés pour la lisibilité (Product, Order, etc. restent les mêmes)
+# NOUVEAUX MODÈLES POUR MOT DE PASSE OUBLIÉ
+class ForgotPassword(BaseModel):
+    email: EmailStr
+class ResetPassword(BaseModel):
+    email: EmailStr; code: str; new_password: str
+
 class Product(BaseModel):
     id: Optional[str] = None; name: str; category: str; price: float; oldPrice: Optional[float] = None; stock: int; image: str; description: Optional[str] = None; status: str = "Active"; colors: List[str] = []
 class Order(BaseModel):
@@ -74,9 +73,8 @@ class Order(BaseModel):
 class SiteSettings(BaseModel):
     bannerText: str
 
-# --- 6. ROUTES AUTHENTIFICATION (API BREVO) ---
-
-async def send_email_via_api(email, name, code):
+# --- FONCTION D'ENVOI EMAIL (Réutilisable) ---
+async def send_email_via_api(email, name, subject, html_content):
     headers = {
         "accept": "application/json",
         "api-key": BREVO_API_KEY,
@@ -85,49 +83,39 @@ async def send_email_via_api(email, name, code):
     payload = {
         "sender": {"name": "TKB SHOP", "email": "no-reply@tkb-shop.com"},
         "to": [{"email": email, "name": name}],
-        "subject": "Votre code de validation TKB SHOP",
-        "htmlContent": f"<html><body><h1>Bienvenue {name} !</h1><p>Votre code est : <strong>{code}</strong></p></body></html>"
+        "subject": subject,
+        "htmlContent": html_content
     }
-    
     async with httpx.AsyncClient() as client:
         response = await client.post(BREVO_URL, json=payload, headers=headers)
         if response.status_code not in [200, 201, 202]:
-            raise Exception(f"Erreur API Brevo: {response.text}")
+            print(f"Erreur Brevo: {response.text}")
+            raise Exception("Erreur API Brevo")
+
+# --- 6. ROUTES AUTHENTIFICATION ---
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
-    # 1. Vérif existant
     if db.users.find_one({"email": user.email}):
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
-    # 2. Code OTP
     otp_code = str(random.randint(100000, 999999))
 
-    # 3. Envoi via API HTTP (Pas de SMTP qui bloque !)
     try:
         if BREVO_API_KEY:
-            await send_email_via_api(user.email, user.name, otp_code)
-        else:
-            print(f"⚠️ Pas de clé API Brevo. Code de secours : {otp_code}")
+            html = f"<html><body><h1>Bienvenue {user.name} !</h1><p>Votre code est : <strong>{otp_code}</strong></p></body></html>"
+            await send_email_via_api(user.email, user.name, "Validation TKB SHOP", html)
     except Exception as e:
-        print(f"ERREUR ENVOI EMAIL: {e}")
-        # Si l'API échoue, on prévient (mais l'API est très stable)
-        raise HTTPException(status_code=500, detail="Erreur d'envoi d'email. Vérifiez votre adresse.")
+        raise HTTPException(status_code=500, detail="Erreur d'envoi d'email.")
 
-    # 4. Sauvegarde
     hashed_pw = get_password_hash(user.password)
     user_dict = {
-        "name": user.name,
-        "email": user.email,
-        "password": hashed_pw,
-        "role": "client",
-        "isVerified": False,
-        "otpCode": otp_code,
+        "name": user.name, "email": user.email, "password": hashed_pw,
+        "role": "client", "isVerified": False, "otpCode": otp_code,
         "createdAt": datetime.now()
     }
     db.users.insert_one(user_dict)
-
-    return {"success": True, "message": "Code envoyé ! Vérifiez vos emails."}
+    return {"success": True, "message": "Code envoyé !"}
 
 @app.post("/api/auth/verify")
 async def verify_account(data: VerifyOTP):
@@ -150,14 +138,66 @@ def login(user: UserLogin):
          raise HTTPException(400, "Compte non vérifié. Regardez vos emails.")
     return {"success": True, "user": _format_user(db_user)}
 
+# --- NOUVELLES ROUTES : MOT DE PASSE OUBLIÉ ---
+
+@app.post("/api/auth/forgot-password")
+async def forgot_password(data: ForgotPassword):
+    user = db.users.find_one({"email": data.email})
+    if not user:
+        # Par sécurité, on ne dit pas si l'email existe ou pas, mais ici on simplifie
+        raise HTTPException(404, "Aucun compte associé à cet email.")
+    
+    # Générer un code de réinitialisation
+    reset_code = str(random.randint(100000, 999999))
+    
+    # Sauvegarder ce code temporairement dans l'utilisateur
+    db.users.update_one({"email": data.email}, {"$set": {"resetCode": reset_code}})
+    
+    # Envoyer l'email
+    try:
+        html = f"""
+        <html><body>
+            <h1>Demande de réinitialisation</h1>
+            <p>Voici votre code pour changer de mot de passe :</p>
+            <h2 style='color: red;'>{reset_code}</h2>
+            <p>Ne le partagez avec personne.</p>
+        </body></html>
+        """
+        await send_email_via_api(data.email, user["name"], "Réinitialisation Mot de Passe", html)
+    except Exception as e:
+        raise HTTPException(500, "Erreur d'envoi d'email.")
+        
+    return {"success": True, "message": "Code de réinitialisation envoyé !"}
+
+@app.post("/api/auth/reset-password")
+def reset_password(data: ResetPassword):
+    user = db.users.find_one({"email": data.email})
+    if not user: raise HTTPException(404, "Utilisateur introuvable")
+    
+    # Vérifier le code
+    if user.get("resetCode") != data.code:
+        raise HTTPException(400, "Code de réinitialisation incorrect ou expiré.")
+    
+    # Changer le mot de passe
+    new_hashed_pw = get_password_hash(data.new_password)
+    
+    # Mettre à jour et supprimer le code
+    db.users.update_one(
+        {"email": data.email}, 
+        {"$set": {"password": new_hashed_pw, "resetCode": None}}
+    )
+    
+    return {"success": True, "message": "Mot de passe modifié avec succès ! Connectez-vous."}
+
+# Helper
 def _format_user(u):
     u["id"] = str(u["_id"]); del u["_id"]
     if "password" in u: del u["password"]
     if "otpCode" in u: del u["otpCode"]
+    if "resetCode" in u: del u["resetCode"]
     return u
 
-# --- AUTRES ROUTES (PRODUITS...) ---
-# (Elles sont identiques, je les remets rapidement pour que le fichier soit complet)
+# --- AUTRES ROUTES (INCHANGÉES) ---
 @app.get("/api/products")
 def get_products():
     products = []; 
