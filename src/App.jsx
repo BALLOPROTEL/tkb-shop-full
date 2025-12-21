@@ -7,8 +7,9 @@ import ProductDetails from './pages/ProductDetails';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import MyOrders from './pages/MyOrders';
-import UserProfile from './pages/UserProfile'; // <--- AJOUT IMPORTANT
+import UserProfile from './pages/UserProfile';
 import AuthModal from './components/auth/AuthModal';
+import ScrollToTop from './components/layout/ScrollToTop'; // <--- IMPORT ICI
 import { CartProvider } from './context/CartContext';
 import { Toaster } from 'react-hot-toast';
 
@@ -19,12 +20,8 @@ import AdminProducts from './pages/admin/AdminProducts';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
 
-// Import de la page Maintenance
 import Maintenance from './pages/Maintenance';
 
-// --- CONFIGURATION ---
-// 🔴 METTRE "true" pour fermer le site (Maintenance)
-// 🟢 METTRE "false" pour ouvrir le site au public (Live)
 const IS_MAINTENANCE_MODE = false;
 
 const AppContent = () => {
@@ -33,10 +30,8 @@ const AppContent = () => {
   const [isMaintenance, setIsMaintenance] = useState(IS_MAINTENANCE_MODE);
   const location = useLocation();
 
-  // Vérifier si l'utilisateur a déjà le "Pass VIP" (stocké dans le navigateur)
   useEffect(() => {
     const hasBypass = localStorage.getItem('maintenance_bypass');
-    // Si on a le pass, on force l'affichage du site même si maintenance = true
     if (hasBypass) {
       setIsMaintenance(false);
     }
@@ -47,7 +42,6 @@ const AppContent = () => {
     setIsAuthOpen(true);
   };
 
-  // Fonction pour débloquer le site (quand tu cliques sur le bouton secret)
   const unlockSite = () => {
     localStorage.setItem('maintenance_bypass', 'true');
     setIsMaintenance(false);
@@ -55,13 +49,13 @@ const AppContent = () => {
 
   const isAdminRoute = location.pathname.startsWith('/admin');
 
-  // SI MAINTENANCE ACTIVÉE ET PAS DE PASS VIP -> AFFICHER MAINTENANCE
   if (isMaintenance) {
     return <Maintenance onBypass={unlockSite} />;
   }
 
   return (
     <div className="flex flex-col min-h-screen font-sans text-slate-900">
+      <ScrollToTop /> {/* <--- PLACÉ ICI : Gère le scroll à chaque changement */}
       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
 
       {!isAdminRoute && <Navbar onOpenAuth={openAuth} />}
@@ -80,7 +74,7 @@ const AppContent = () => {
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/my-orders" element={<MyOrders />} />
-          <Route path="/user-profile" element={<UserProfile />} /> {/* <--- ROUTE AJOUTÉE */}
+          <Route path="/profile" element={<UserProfile />} />
 
           {/* ADMIN */}
           <Route path="/admin" element={<AdminLayout><DashboardHome /></AdminLayout>} />

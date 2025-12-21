@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Lock, User, Loader, CheckSquare, ArrowLeft, CheckCircle } from 'lucide-react';
+import { X, Mail, Lock, User, Loader, CheckSquare, ArrowLeft, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { API_BASE_URL } from '../../config';
 
@@ -12,16 +12,37 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
         name: '', email: '', password: '', otp: '', newPassword: ''
     });
 
-    // --- C'EST ICI QUE LA MAGIE OPÈRE (CORRECTION DU BUG) ---
     useEffect(() => {
         if (isOpen) {
-            setMode(initialMode); // On force le mode demandé (login ou register)
-            setIsHuman(false);    // On décoche le captcha
-            setFormData({ name: '', email: '', password: '', otp: '', newPassword: '' }); // On vide les champs
+            setMode(initialMode);
+            setIsHuman(false);
+            setFormData({ name: '', email: '', password: '', otp: '', newPassword: '' });
         }
     }, [isOpen, initialMode]);
 
     if (!isOpen) return null;
+
+    // Fonction pour renvoyer le code (si expiré ou incorrect)
+    const handleResendCode = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formData.email })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success("Nouveau code envoyé !");
+            } else {
+                toast.error("Erreur lors de l'envoi.");
+            }
+        } catch (error) {
+            toast.error("Erreur réseau");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -108,26 +129,33 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                         <h2 className="text-2xl font-bold text-slate-900">{getTitle()}</h2>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* autoComplete="off" global pour décourager le navigateur */}
+                    <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
 
                         {mode === 'register' && (
                             <div className="relative">
                                 <User className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="text" placeholder="Nom complet" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                                <input type="text" placeholder="Nom complet" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
+                                    value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    required autoComplete="off" />
                             </div>
                         )}
 
                         {(mode !== 'reset' && mode !== 'verify') && (
                             <div className="relative">
                                 <Mail className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="email" placeholder="Email" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+                                <input type="email" placeholder="Email" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
+                                    value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    required autoComplete="new-email" />
                             </div>
                         )}
 
                         {(mode === 'login' || mode === 'register') && (
                             <div className="relative">
                                 <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="password" placeholder="Mot de passe" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
+                                <input type="password" placeholder="Mot de passe" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
+                                    value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    required autoComplete="new-password" />
                             </div>
                         )}
 
@@ -136,7 +164,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                                 <p className="text-xs text-slate-500 mb-2">Code envoyé à {formData.email}</p>
                                 <div className="relative">
                                     <CheckCircle className="absolute left-4 top-3.5 text-green-500" size={20} />
-                                    <input type="text" placeholder="Code (ex: 123456)" className="w-full pl-12 p-3 bg-white border-2 border-green-500 rounded-xl font-bold text-center tracking-widest text-xl outline-none" value={formData.otp} onChange={(e) => setFormData({ ...formData, otp: e.target.value })} required autoFocus />
+                                    <input type="text" placeholder="Code (ex: 123456)" className="w-full pl-12 p-3 bg-white border-2 border-green-500 rounded-xl font-bold text-center tracking-widest text-xl outline-none"
+                                        value={formData.otp} onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
+                                        required autoFocus autoComplete="off" />
                                 </div>
                             </div>
                         )}
@@ -144,7 +174,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                         {mode === 'reset' && (
                             <div className="relative">
                                 <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="password" placeholder="Nouveau mot de passe" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900" value={formData.newPassword} onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })} required />
+                                <input type="password" placeholder="Nouveau mot de passe" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
+                                    value={formData.newPassword} onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                                    required autoComplete="new-password" />
                             </div>
                         )}
 
@@ -166,7 +198,15 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
                         </button>
                     </form>
 
-                    <div className="mt-6 text-center space-y-2">
+                    {/* Gestion des liens et retours */}
+                    <div className="mt-6 text-center space-y-3">
+                        {/* Bouton Renvoyer code pour RESET */}
+                        {mode === 'reset' && (
+                            <button onClick={handleResendCode} className="flex items-center justify-center gap-2 text-xs font-bold text-pink-600 hover:underline w-full">
+                                <RefreshCw size={12} /> Code incorrect ou expiré ? Renvoyer un code
+                            </button>
+                        )}
+
                         {mode === 'login' && (
                             <button onClick={() => setMode('forgot')} className="text-sm text-slate-500 hover:text-slate-900 underline">
                                 Mot de passe oublié ?
