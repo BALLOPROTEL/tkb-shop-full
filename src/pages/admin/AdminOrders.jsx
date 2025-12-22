@@ -115,7 +115,7 @@ const AdminOrders = () => {
                       <div className="font-bold text-slate-200">{order.productName}</div>
                       <div className="text-xs text-slate-500">Qté: {order.quantity}</div>
                     </td>
-                    <td className="p-4 font-bold text-blue-400">{(order.totalPrice || order.price).toLocaleString()} F</td>
+                    <td className="p-4 font-bold text-blue-400">{(order.totalPrice || order.price).toLocaleString()} F CFA</td>
                     <td className="p-4 text-slate-400 text-xs max-w-[200px] truncate" title={order.address}>{order.address}</td>
                     <td className="p-4">{getStatusBadge(order.status)}</td>
                     <td className="p-4 text-right">

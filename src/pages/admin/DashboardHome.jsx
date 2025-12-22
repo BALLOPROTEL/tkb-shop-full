@@ -174,7 +174,7 @@ const DashboardHome = () => {
             {/* KPI Cards (Dark) */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex justify-between items-center shadow-lg hover:bg-slate-750 transition-colors">
-                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Revenus</p><h3 className="text-2xl font-bold text-white mt-1">{kpi.revenue ? kpi.revenue.toLocaleString() : 0} F</h3></div>
+                    <div><p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Revenus</p><h3 className="text-2xl font-bold text-white mt-1">{kpi.revenue ? kpi.revenue.toLocaleString() : 0} F CFA</h3></div>
                     <div className="p-3 bg-green-500/10 text-green-400 rounded-xl"><DollarSign size={24} /></div>
                 </div>
                 <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl flex justify-between items-center shadow-lg hover:bg-slate-750 transition-colors">

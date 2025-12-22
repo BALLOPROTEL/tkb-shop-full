@@ -44,7 +44,7 @@ const PaymentModal = ({ isOpen, onClose, onSuccess, amount }) => {
                     {/* ÉTAPE 1 : CHOIX */}
                     {step === 1 && (
                         <div className="space-y-4">
-                            <p className="text-center text-slate-500 mb-4">Montant à payer : <span className="text-slate-900 font-bold">{amount.toLocaleString()} F</span></p>
+                            <p className="text-center text-slate-500 mb-4">Montant à payer : <span className="text-slate-900 font-bold">{amount.toLocaleString()} F CFA</span></p>
                             <div className="grid grid-cols-2 gap-4">
                                 <button onClick={() => handleMethodSelect('Orange Money')} className="p-4 border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all flex flex-col items-center gap-2">
                                     <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs">OM</div>

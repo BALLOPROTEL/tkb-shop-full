@@ -124,8 +124,8 @@ const AdminProducts = () => {
 
             <div className="flex items-center justify-between w-full md:w-auto gap-6 border-t md:border-t-0 border-slate-700 pt-4 md:pt-0">
               <div className="text-right">
-                <div className="text-blue-400 font-bold text-xl">{p.price.toLocaleString()} F</div>
-                {p.oldPrice && <div className="text-slate-500 line-through text-sm font-medium">{p.oldPrice.toLocaleString()} F</div>}
+                <div className="text-blue-400 font-bold text-xl">{p.price.toLocaleString()} F CFA</div>
+                {p.oldPrice && <div className="text-slate-500 line-through text-sm font-medium">{p.oldPrice.toLocaleString()} F CFA</div>}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => openModal(p)} className="p-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500 hover:text-white transition-colors"><Edit2 size={18} /></button>
