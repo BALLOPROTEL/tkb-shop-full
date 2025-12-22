@@ -18,7 +18,7 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://tkb-shop-full.vercel.app",
-    "https://tkb-shop-full.vercel.app/"
+    "https://tkb-shop.vercel.app/"
 ]
 
 app.add_middleware(
