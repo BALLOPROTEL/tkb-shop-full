@@ -17,7 +17,7 @@ const Checkout = () => {
     const [loading, setLoading] = useState(false);
     const [payMode, setPayMode] = useState('kkiapay');
     const [showLoginModal, setShowLoginModal] = useState(false);
-
+    const [isRedirecting, setIsRedirecting] = useState(false);
     // 👇 INITIALISATION UNIQUE (Règle le problème du texte "tkb_shop" qui revient)
     const [formData, setFormData] = useState({
         firstName: user?.name?.split(' ')[0] || '',
@@ -33,8 +33,12 @@ const Checkout = () => {
 
     // Redirection si panier vide
     useEffect(() => {
-        if (cart.length === 0) navigate('/');
-    }, [cart, navigate]);
+        // On ne redirige vers l'accueil QUE si le panier est vide 
+        // ET qu'on n'est pas en train de finaliser une commande
+        if (cart.length === 0 && !isRedirecting) {
+            navigate('/');
+        }
+    }, [cart, navigate, isRedirecting]);
 
     // --- LOGIQUE DE PAIEMENT ---
     const handleKkiapay = () => {
@@ -57,8 +61,11 @@ const Checkout = () => {
 
     const saveOrder = async (transactionId) => {
         setLoading(true);
+        setIsRedirecting(true);
         try {
             const userId = user.id || user._id;
+
+            // 1. On prépare l'enregistrement de chaque article du panier
             const orderPromises = cart.map(item => {
                 return fetch(`${API_BASE_URL}/api/orders`, {
                     method: 'POST',
@@ -76,12 +83,22 @@ const Checkout = () => {
                     })
                 });
             });
+
+            // 2. On attend que tout soit enregistré sur Render
             await Promise.all(orderPromises);
+
+            // 3. On vide le panier
             clearCart();
-            toast.success("Commande réussie !");
+
+            // 4. ON REDIRIGE VERS LA PAGE DE SUCCÈS (Le point critique)
+            // Assurez-vous que cette route existe dans votre App.jsx
+            toast.success("Paiement validé !");
             navigate('/payment-success');
+
         } catch (err) {
-            toast.error("Erreur d'enregistrement");
+            console.error("Erreur saveOrder:", err);
+            toast.error("Erreur lors de l'enregistrement de la commande.");
+            // En cas d'erreur, on reste sur la page pour que l'utilisateur puisse nous contacter
         } finally {
             setLoading(false);
         }
