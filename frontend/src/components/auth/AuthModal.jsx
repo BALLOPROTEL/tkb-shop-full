@@ -1,230 +1,115 @@
-import React, { useState, useEffect } from 'react';
-import { X, Mail, Lock, User, Loader, CheckSquare, ArrowLeft, CheckCircle, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Mail, Lock, User, Loader2 } from 'lucide-react';
+import api from '../../api'; // UTILISATION OBLIGATOIRE DE TON INSTANCE API
 import { toast } from 'react-hot-toast';
-import { API_BASE_URL } from '../../config';
 
-const AuthModal = ({ isOpen, onClose, initialMode = 'login' }) => {
-    const [mode, setMode] = useState(initialMode);
+export default function AuthModal({ isOpen, onClose }) {
+    const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
-    const [isHuman, setIsHuman] = useState(false);
-
-    const [formData, setFormData] = useState({
-        name: '', email: '', password: '', otp: '', newPassword: ''
-    });
-
-    useEffect(() => {
-        if (isOpen) {
-            setMode(initialMode);
-            setIsHuman(false);
-            setFormData({ name: '', email: '', password: '', otp: '', newPassword: '' });
-        }
-    }, [isOpen, initialMode]);
+    const [formData, setFormData] = useState({ name: '', email: '', password: '' });
 
     if (!isOpen) return null;
 
-    // Fonction pour renvoyer le code (si expiré ou incorrect)
-    const handleResendCode = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: formData.email })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                toast.success("Nouveau code envoyé !");
-            } else {
-                toast.error("Erreur lors de l'envoi.");
-            }
-        } catch (error) {
-            toast.error("Erreur réseau");
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        if ((mode === 'register' || mode === 'login') && !isHuman) {
-            toast.error("Veuillez cocher la case 'Je ne suis pas un robot'");
-            return;
-        }
-
         setLoading(true);
-        let endpoint = '';
-        let body = {};
 
-        if (mode === 'login') {
-            endpoint = '/api/auth/login';
-            body = { email: formData.email, password: formData.password };
-        } else if (mode === 'register') {
-            endpoint = '/api/auth/register';
-            body = { name: formData.name, email: formData.email, password: formData.password };
-        } else if (mode === 'verify') {
-            endpoint = '/api/auth/verify';
-            body = { email: formData.email, otp: formData.otp };
-        } else if (mode === 'forgot') {
-            endpoint = '/api/auth/forgot-password';
-            body = { email: formData.email };
-        } else if (mode === 'reset') {
-            endpoint = '/api/auth/reset-password';
-            body = { email: formData.email, code: formData.otp, new_password: formData.newPassword };
-        }
+        // Formatage des données pour FastAPI
+        const payload = isLogin
+            ? { email: formData.email, password: formData.password }
+            : formData;
+
+        const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
 
         try {
-            const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            const data = await res.json();
+            const res = await api.post(endpoint, payload);
 
-            if (res.ok && data.success) {
-                if (mode === 'register') {
-                    toast.success("Code envoyé par email ! 📧");
-                    setMode('verify');
-                } else if (mode === 'forgot') {
-                    toast.success("Code de réinitialisation envoyé !");
-                    setMode('reset');
-                } else if (mode === 'reset') {
-                    toast.success("Mot de passe modifié ! Connectez-vous.");
-                    setMode('login');
-                    setIsHuman(false);
-                } else {
-                    toast.success("Bienvenue !");
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    window.location.reload();
-                    onClose();
-                }
+            if (isLogin) {
+                localStorage.setItem('user', JSON.stringify(res.data.user));
+                localStorage.setItem('access_token', res.data.access_token);
+                toast.success(`Heureux de vous revoir ${res.data.user.name} !`);
+                onClose();
+                window.location.reload();
             } else {
-                toast.error(data.detail || "Erreur inconnue");
+                toast.success("Compte créé ! Connectez-vous.");
+                setIsLogin(true);
             }
-        } catch (error) {
-            toast.error("Erreur de connexion serveur");
+        } catch (err) {
+            // Affiche l'erreur précise renvoyée par FastAPI
+            const errorMsg = err.response?.data?.detail || "Erreur de connexion";
+            toast.error(errorMsg);
         } finally {
             setLoading(false);
         }
-    };
-
-    const getTitle = () => {
-        if (mode === 'login') return 'Connexion';
-        if (mode === 'register') return 'Inscription';
-        if (mode === 'verify') return 'Vérification';
-        if (mode === 'forgot') return 'Mot de passe oublié';
-        if (mode === 'reset') return 'Nouveau mot de passe';
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative">
-                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-black"><X /></button>
-
-                <div className="p-8 pt-10">
-                    <div className="flex items-center gap-2 mb-6">
-                        {(mode === 'verify' || mode === 'forgot' || mode === 'reset') && (
-                            <button onClick={() => setMode('login')} className="p-1 rounded-full hover:bg-slate-100"><ArrowLeft size={20} /></button>
-                        )}
-                        <h2 className="text-2xl font-bold text-slate-900">{getTitle()}</h2>
-                    </div>
-
-                    {/* autoComplete="off" global pour décourager le navigateur */}
-                    <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-
-                        {mode === 'register' && (
-                            <div className="relative">
-                                <User className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="text" placeholder="Nom complet" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
-                                    value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    required autoComplete="off" />
-                            </div>
-                        )}
-
-                        {(mode !== 'reset' && mode !== 'verify') && (
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="email" placeholder="Email" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
-                                    value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    required autoComplete="new-email" />
-                            </div>
-                        )}
-
-                        {(mode === 'login' || mode === 'register') && (
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="password" placeholder="Mot de passe" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
-                                    value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    required autoComplete="new-password" />
-                            </div>
-                        )}
-
-                        {(mode === 'verify' || mode === 'reset') && (
-                            <div className="text-center">
-                                <p className="text-xs text-slate-500 mb-2">Code envoyé à {formData.email}</p>
-                                <div className="relative">
-                                    <CheckCircle className="absolute left-4 top-3.5 text-green-500" size={20} />
-                                    <input type="text" placeholder="Code (ex: 123456)" className="w-full pl-12 p-3 bg-white border-2 border-green-500 rounded-xl font-bold text-center tracking-widest text-xl outline-none"
-                                        value={formData.otp} onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                                        required autoFocus autoComplete="off" />
-                                </div>
-                            </div>
-                        )}
-
-                        {mode === 'reset' && (
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                                <input type="password" placeholder="Nouveau mot de passe" className="w-full pl-12 p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-slate-900"
-                                    value={formData.newPassword} onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                                    required autoComplete="new-password" />
-                            </div>
-                        )}
-
-                        {(mode === 'login' || mode === 'register') && (
-                            <div
-                                onClick={() => setIsHuman(!isHuman)}
-                                className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                            >
-                                <div className={`w-6 h-6 rounded flex items-center justify-center border transition-all ${isHuman ? 'bg-green-500 border-green-500' : 'bg-white border-slate-300'}`}>
-                                    {isHuman && <CheckSquare size={16} className="text-white" />}
-                                </div>
-                                <span className="text-sm text-slate-600 font-medium">Je ne suis pas un robot 🤖</span>
-                            </div>
-                        )}
-
-                        <button disabled={loading} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all flex justify-center items-center gap-2">
-                            {loading && <Loader className="animate-spin" size={18} />}
-                            {mode === 'login' ? 'Se connecter' : mode === 'register' ? "S'inscrire" : mode === 'forgot' ? 'Envoyer le code' : 'Valider'}
-                        </button>
-                    </form>
-
-                    {/* Gestion des liens et retours */}
-                    <div className="mt-6 text-center space-y-3">
-                        {/* Bouton Renvoyer code pour RESET */}
-                        {mode === 'reset' && (
-                            <button onClick={handleResendCode} className="flex items-center justify-center gap-2 text-xs font-bold text-pink-600 hover:underline w-full">
-                                <RefreshCw size={12} /> Code incorrect ou expiré ? Renvoyer un code
-                            </button>
-                        )}
-
-                        {mode === 'login' && (
-                            <button onClick={() => setMode('forgot')} className="text-sm text-slate-500 hover:text-slate-900 underline">
-                                Mot de passe oublié ?
-                            </button>
-                        )}
-                        {(mode === 'login' || mode === 'register') && (
-                            <p className="text-sm text-slate-500">
-                                {mode === 'login' ? "Pas de compte ?" : "Déjà membre ?"}
-                                <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setIsHuman(false); }} className="text-slate-900 font-bold ml-2 hover:underline">
-                                    {mode === 'login' ? "S'inscrire" : "Se connecter"}
-                                </button>
-                            </p>
-                        )}
-                    </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
+                <div className="p-8 text-center relative border-b border-slate-50">
+                    <button onClick={onClose} className="absolute right-6 top-6 text-slate-300 hover:text-slate-900 transition-colors"><X size={20} /></button>
+                    <h2 className="text-2xl font-serif text-slate-900">{isLogin ? 'Connexion Privée' : 'Créer un compte'}</h2>
                 </div>
+
+                <form onSubmit={handleSubmit} className="p-8 space-y-5">
+                    {!isLogin && (
+                        <div className="relative">
+                            <User className="absolute left-4 top-4 text-slate-300" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Nom complet"
+                                className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-pink-100 transition-all"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                required
+                            />
+                        </div>
+                    )}
+
+                    <div className="relative">
+                        <Mail className="absolute left-4 top-4 text-slate-300" size={18} />
+                        <input
+                            type="email"
+                            placeholder="Email professionnel"
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-pink-100 transition-all"
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            required
+                        />
+                    </div>
+
+                    <div className="relative">
+                        <Lock className="absolute left-4 top-4 text-slate-300" size={18} />
+                        <input
+                            type="password"
+                            placeholder="Mot de passe"
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-pink-100 transition-all"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            required
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold shadow-xl hover:bg-pink-600 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                    >
+                        {loading ? <Loader2 className="animate-spin" /> : (isLogin ? 'Se Connecter' : 'Créer mon compte')}
+                    </button>
+
+                    <p className="text-center text-xs text-slate-400">
+                        {isLogin ? "Nouveau chez TKB ?" : "Déjà un compte ?"}
+                        <button
+                            type="button"
+                            onClick={() => setIsLogin(!isLogin)}
+                            className="ml-2 text-slate-900 font-bold underline"
+                        >
+                            {isLogin ? "Créer un profil" : "Se connecter"}
+                        </button>
+                    </p>
+                </form>
             </div>
         </div>
     );
-};
-
-export default AuthModal;
+}

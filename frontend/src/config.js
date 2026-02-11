@@ -1,8 +1,4 @@
 // Adresse du Backend (Local pour tes tests, Render pour la prod)
-// Tu changeras cette ligne quand tu voudras tester sur ton téléphone.
-
-// Option 1 : Pour tester en LOCAL sur ton PC (Rapide)
-// export const API_BASE_URL = "http://127.0.0.1:8000";
-
-// Option 2 : Pour tester sur TÉLÉPHONE ou mettre en ligne (Vrai site)
-export const API_BASE_URL = "https://tkb-shop.onrender.com";
+// Utilise VITE_API_BASE_URL si défini, sinon fallback local.
+const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;

@@ -1,41 +1,51 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, ShoppingBag, ShoppingCart, ChevronDown, Package, Instagram, Facebook, Twitter } from 'lucide-react';
+import {
+    User,
+    ShoppingBag,
+    LogOut,
+    Shield,
+    Menu,
+    X,
+    ChevronDown,
+    Heart
+} from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { API_BASE_URL } from '../../config';
+import api from '../../api'; // Instance Axios Expert
+import { useFavorites } from '../../context/FavoritesContext';
 
 const Navbar = ({ onOpenAuth }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
-    const [user, setUser] = useState(null);
-    const [bannerText, setBannerText] = useState("Bienvenue !");
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [activeDropdown, setActiveDropdown] = useState(null);
+    const [user, setUser] = useState(() => {
+        const storedUser = localStorage.getItem('user');
+        return storedUser ? JSON.parse(storedUser) : null;
+    });
+    const [bannerText, setBannerText] = useState("CHARGEMENT...");
 
     const navigate = useNavigate();
     const { cartCount } = useCart();
+    const { favoritesCount } = useFavorites();
+    const profileRef = useRef(null);
 
-    // Pour fermer le menu si on clique ailleurs (Bonus UX)
-    const menuRef = useRef(null);
-
+    // 1. GESTION DU SCROLL ET DE L'AUTH
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) setUser(JSON.parse(storedUser));
-
-        const handleScroll = () => setIsScrolled(window.scrollY > 40);
+        const handleScroll = () => setIsScrolled(window.scrollY > 20);
         window.addEventListener('scroll', handleScroll);
 
-        // Fermer le menu si on clique en dehors
-        const handleClickOutside = (event) => {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
-                setIsProfileMenuOpen(false);
+        const handleClickOutside = (e) => {
+            if (profileRef.current && !profileRef.current.contains(e.target)) {
+                setIsProfileOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
 
-        fetch(`${API_BASE_URL}/api/settings`)
-            .then(res => res.json())
-            .then(data => setBannerText(data.bannerText || "Bienvenue !"))
-            .catch(err => console.error(err));
+        // RÉCUPÉRATION DU MESSAGE DYNAMIQUE (Backend Python)
+        api.get('/api/settings')
+            .then(res => setBannerText(res.data.bannerText || "BIENVENUE CHEZ TKB SHOP"))
+            .catch(() => setBannerText("LIVRAISON OFFERTE DÈS 50.000 FCFA"));
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
@@ -45,189 +55,226 @@ const Navbar = ({ onOpenAuth }) => {
 
     const handleLogout = () => {
         localStorage.removeItem('user');
+        localStorage.removeItem('access_token');
         setUser(null);
-        setIsProfileMenuOpen(false);
-        setIsOpen(false);
         navigate('/');
         window.location.reload();
     };
 
-    const closeMenu = () => {
-        setIsOpen(false);
-        setIsProfileMenuOpen(false); // <--- C'est ça qui force la fermeture
-    };
-
+    // 2. STRUCTURE COMPLÈTE DES CATÉGORIES (Aucune coupe)
     const navLinks = [
-        { name: 'Nouveautés', href: '/' },
-        { name: 'Sacs', href: '/#sacs' },
-        { name: 'Chaussures', href: '/#chaussures' },
-        { name: 'Accessoires', href: '/#accessoires' },
+        { name: 'Nouveautés', path: '/' },
+        { name: 'Sacs', path: '/shop/sacs' },
+        {
+            name: 'Chaussures',
+            path: '/shop/chaussures',
+            subLinks: [
+                { name: 'Femme', path: '/shop/chaussures/femme' },
+                { name: 'Homme', path: '/shop/chaussures/homme' },
+                { name: 'Bébé', path: '/shop/chaussures/bebe' }
+            ]
+        },
+        {
+            name: 'Accessoires',
+            path: '/shop/accessoires',
+            subLinks: [
+                { name: 'Colliers', path: '/shop/accessoires/colliers' },
+                { name: 'Bagues', path: '/shop/accessoires/bagues' },
+                { name: 'Bracelets', path: '/shop/accessoires/bracelets' }
+            ]
+        },
+        {
+            name: 'Vêtements',
+            path: '/shop/vetements',
+            subLinks: [
+                { name: 'Robes', path: '/shop/vetements/robes' },
+                { name: 'Abayas', path: '/shop/vetements/abayas' },
+                { name: 'Voiles & Hijabs', path: '/shop/vetements/voiles-et-hijabs' }
+            ]
+        },
     ];
 
     return (
-        <>
-            {/* BANDEAU PUB */}
-            <div className="bg-pink-600 text-white text-xs font-bold py-2 overflow-hidden relative z-50">
-                <div className="whitespace-nowrap animate-marquee flex gap-10">
-                    <span>{bannerText}</span><span>•</span><span>{bannerText}</span><span>•</span><span>{bannerText}</span>
-                </div>
+        <header className="fixed top-0 w-full z-50 transition-all duration-500">
+            {/* BANDEAU ANNONCE DYNAMIQUE */}
+            <div className="bg-slate-950 text-white py-2.5 text-[9px] tracking-[0.4em] font-black text-center uppercase border-b border-white/5">
+                {bannerText}
             </div>
 
-            {/* NAVBAR */}
-            <nav className={`sticky top-0 w-full z-40 transition-all duration-300 ${isScrolled
-                ? 'bg-white/95 backdrop-blur-md shadow-md py-3 text-slate-900'
-                : 'bg-[#fff0f5] py-4 text-slate-800'
+            {/* NAVIGATION PRINCIPALE */}
+            <nav className={`transition-all duration-500 ${isScrolled
+                    ? 'bg-white/95 backdrop-blur-md py-4 shadow-sm border-b border-slate-100'
+                    : 'bg-transparent py-7 border-b border-transparent'
                 }`}>
-                <div className="container mx-auto px-6 flex justify-between items-center">
+                <div className="container mx-auto px-8 flex items-center justify-between">
 
-                    {/* LOGO */}
-                    <Link to="/" className="text-xl font-extrabold flex items-center gap-2 tracking-tighter z-50 relative">
-                        <div className={`p-1.5 rounded-lg transition-colors ${isScrolled ? 'bg-pink-600 text-white' : 'bg-slate-900 text-pink-200'}`}>
-                            <ShoppingBag size={20} />
-                        </div>
-                        <span className="font-serif tracking-wide">TKB<span className="text-pink-600">_SHOP</span></span>
-                    </Link>
+                    {/* GAUCHE : Logo & Hamburger */}
+                    <div className="flex items-center gap-8">
+                        <button className="md:hidden text-slate-900" onClick={() => setIsMobileMenuOpen(true)}>
+                            <Menu size={24} strokeWidth={1.5} />
+                        </button>
 
-                    {/* MENU DESKTOP */}
-                    <div className="hidden md:flex items-center gap-8">
-                        {navLinks.map((link) => (
-                            <a key={link.name} href={link.href} className="font-medium hover:text-pink-600 transition-colors uppercase text-xs tracking-widest">
-                                {link.name}
-                            </a>
+                        <Link to="/" className="group">
+                            <span className="font-serif text-2xl md:text-3xl tracking-tighter text-slate-900">
+                                TKB<span className="font-light italic text-pink-600 group-hover:text-pink-400 transition-colors">_</span>SHOP
+                            </span>
+                        </Link>
+                    </div>
+
+                    {/* MILIEU : Liens avec Dropdowns Sophistiqués */}
+                    <div className="hidden md:flex items-center gap-10">
+                        {navLinks.map(link => (
+                            <div
+                                key={link.name}
+                                className="relative group"
+                                onMouseEnter={() => setActiveDropdown(link.name)}
+                                onMouseLeave={() => setActiveDropdown(null)}
+                            >
+                                <Link
+                                    to={link.path}
+                                    className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.25em] font-bold text-slate-900 hover:text-pink-600 transition-colors py-2"
+                                >
+                                    {link.name}
+                                    {link.subLinks && <ChevronDown size={10} className={`transition-transform duration-300 ${activeDropdown === link.name ? 'rotate-180' : ''}`} />}
+                                </Link>
+
+                                {link.subLinks && activeDropdown === link.name && (
+                                    <div className="absolute left-0 pt-4 w-56 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="bg-white border border-slate-100 shadow-2xl py-6 px-2 rounded-sm">
+                                            {link.subLinks.map(sub => (
+                                                <Link
+                                                    key={sub.name}
+                                                    to={sub.path}
+                                                    className="block px-6 py-3 text-[9px] uppercase tracking-[0.2em] text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-all font-bold"
+                                                >
+                                                    {sub.name}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         ))}
                     </div>
 
-                    {/* ZONE DROITE */}
-                    <div className="flex items-center gap-4">
-                        <Link to="/cart" className="relative hover:text-pink-600 transition-colors">
-                            <ShoppingCart size={24} />
-                            {cartCount > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-pink-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full animate-bounce">
-                                    {cartCount}
+                    {/* DROITE : Actions Utilisateur */}
+                    <div className="flex items-center gap-6">
+                        <div className="relative" ref={profileRef}>
+                            {user ? (
+                                <button
+                                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                    className="p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
+                                >
+                                    <User size={19} strokeWidth={1.5} />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={onOpenAuth}
+                                    className="text-[10px] uppercase tracking-[0.2em] font-black bg-slate-900 text-white px-6 py-2.5 hover:bg-pink-600 transition-all shadow-lg shadow-slate-200"
+                                >
+                                    Se connecter
+                                </button>
+                            )}
+
+                            {isProfileOpen && (
+                                <div className="absolute right-0 mt-6 w-52 bg-white border border-slate-100 shadow-2xl py-3 rounded-xl animate-in fade-in zoom-in duration-200">
+                                    <div className="px-6 py-3 border-b border-slate-50 mb-2">
+                                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Compte</p>
+                                        <p className="text-xs font-bold text-slate-900 truncate">{user?.name}</p>
+                                    </div>
+                                    {user?.role === 'admin' && (
+                                        <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-3 px-6 py-3 text-[10px] uppercase font-black text-blue-600 hover:bg-blue-50">
+                                            <Shield size={14} /> Console admin
+                                        </Link>
+                                    )}
+                                    <Link to="/profile" onClick={() => setIsProfileOpen(false)} className="block px-6 py-3 text-[10px] uppercase font-bold text-slate-700 hover:bg-slate-50 tracking-widest">Mon Profil</Link>
+                                    <Link to="/my-orders" onClick={() => setIsProfileOpen(false)} className="block px-6 py-3 text-[10px] uppercase font-bold text-slate-700 hover:bg-slate-50 tracking-widest">Mes Achats</Link>
+                                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-6 py-3 text-[10px] uppercase font-black text-red-500 hover:bg-red-50 border-t border-slate-50 mt-2">
+                                        <LogOut size={14} /> Déconnexion
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <Link to="/favorites" className="relative p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
+                            <Heart size={19} strokeWidth={1.5} />
+                            {favoritesCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black">
+                                    {favoritesCount}
                                 </span>
                             )}
                         </Link>
 
-                        {/* User Desktop */}
-                        <div className="hidden md:block" ref={menuRef}>
-                            {user ? (
-                                <div className="relative">
-                                    <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-2 font-bold px-3 py-1.5 rounded-full border border-slate-200 hover:bg-slate-50 transition-all">
-                                        <div className="w-6 h-6 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xs">{user.name.charAt(0).toUpperCase()}</div>
-                                        <span className="max-w-[80px] truncate text-xs">{user.name}</span>
-                                        <ChevronDown size={14} />
-                                    </button>
-
-                                    {isProfileMenuOpen && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-pink-100 overflow-hidden py-1 animate-in fade-in slide-in-from-top-2">
-                                            {user.role === 'admin' && (
-                                                <Link to="/admin" onClick={closeMenu} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-pink-50 text-slate-700">
-                                                    <Package size={16} /> Admin
-                                                </Link>
-                                            )}
-                                            <Link to="/profile" onClick={closeMenu} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-pink-50 text-slate-700">
-                                                <User size={16} /> Profil
-                                            </Link>
-                                            <Link to="/my-orders" onClick={closeMenu} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-pink-50 text-slate-700">
-                                                <Package size={16} /> Commandes
-                                            </Link>
-                                            <div className="border-t my-1"></div>
-                                            <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50">
-                                                <LogOut size={16} /> Déconnexion
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <button onClick={() => onOpenAuth('login')} className="text-sm font-bold hover:text-pink-600">Connexion</button>
+                        <Link to="/cart" className="relative p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
+                            <ShoppingBag size={19} strokeWidth={1.5} />
+                            {cartCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black animate-pulse">
+                                    {cartCount}
+                                </span>
                             )}
-                        </div>
-
-                        {/* BOUTON BURGER (Mobile) */}
-                        <button className="md:hidden z-50 relative p-1" onClick={() => setIsOpen(!isOpen)}>
-                            {isOpen ? <X size={28} className="text-slate-900" /> : <Menu size={28} className="text-slate-900" />}
-                        </button>
+                        </Link>
                     </div>
                 </div>
-
-                {/* --- MENU MOBILE LUXE --- */}
-                {isOpen && (
-                    <div className="fixed inset-0 top-0 left-0 w-full h-screen bg-white z-[60] flex flex-col pt-24 animate-in slide-in-from-top-10 duration-300">
-                        <button className="absolute top-6 right-6 p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors" onClick={closeMenu}>
-                            <X size={24} />
-                        </button>
-
-                        <div className="flex flex-col gap-2 px-6 overflow-y-auto flex-grow">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Menu</p>
-                            {navLinks.map((link) => (
-                                <a key={link.name} href={link.href} onClick={closeMenu} className="text-2xl font-serif font-bold text-slate-900 py-3 border-b border-slate-50 hover:text-pink-600 transition-colors">
-                                    {link.name}
-                                </a>
-                            ))}
-                        </div>
-
-                        <div className="mt-auto bg-slate-50 border-t border-slate-200 p-6 pb-10">
-                            {user ? (
-                                <div className="space-y-3">
-                                    <Link to="/profile" onClick={closeMenu} className="flex items-center gap-3 mb-6 bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95 border border-slate-100">
-                                        <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xl font-bold border-2 border-white shadow-sm">
-                                            {user.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-slate-900 text-lg leading-tight">{user.name}</p>
-                                            <p className="text-xs text-pink-600 font-bold">Voir mon profil</p>
-                                        </div>
-                                        <div className="ml-auto bg-slate-100 p-2 rounded-full"><User size={16} className="text-slate-400" /></div>
-                                    </Link>
-
-                                    <Link to="/my-orders" onClick={closeMenu} className="flex items-center justify-between p-4 bg-white rounded-xl font-medium text-slate-700 shadow-sm active:scale-95 transition-all">
-                                        <span>📦 Mes Commandes</span>
-                                        <ChevronDown size={16} className="-rotate-90 text-slate-400" />
-                                    </Link>
-
-                                    {user.role === 'admin' && (
-                                        <Link to="/admin" onClick={closeMenu} className="flex items-center justify-between p-4 bg-slate-900 text-white rounded-xl font-medium shadow-lg active:scale-95 transition-all">
-                                            <span>👑 Espace Admin</span>
-                                            <ChevronDown size={16} className="-rotate-90 text-slate-400" />
-                                        </Link>
-                                    )}
-
-                                    <button onClick={handleLogout} className="w-full py-4 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors mt-2">
-                                        Se déconnecter
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <p className="text-center text-sm text-slate-500 mb-2">Connectez-vous pour accéder à votre espace</p>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <button onClick={() => { onOpenAuth('login'); closeMenu(); }} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                                            <User size={18} /> Se connecter
-                                        </button>
-                                        <button onClick={() => { onOpenAuth('register'); closeMenu(); }} className="w-full py-4 bg-pink-600 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                                            Créer un compte
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center gap-4">
-                                <div className="flex gap-6 text-slate-400">
-                                    <Instagram size={20} className="hover:text-pink-600 transition-colors cursor-pointer" />
-                                    <Facebook size={20} className="hover:text-blue-600 transition-colors cursor-pointer" />
-                                    <Twitter size={20} className="hover:text-blue-400 transition-colors cursor-pointer" />
-                                </div>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">© 2025 TKB_SHOP • Tous droits réservés</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </nav>
 
-            <style>{`
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .animate-marquee { animation: marquee 20s linear infinite; }
-      `}</style>
-        </>
+            {/* MENU MOBILE PLEIN ÉCRAN */}
+            {isMobileMenuOpen && (
+                <div className="fixed inset-0 bg-white z-[60] flex flex-col p-10 overflow-y-auto animate-in slide-in-from-left duration-500">
+                    <div className="flex justify-end mb-10">
+                        <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-slate-50 rounded-full">
+                            <X size={28} strokeWidth={1.5} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-8">
+                        {navLinks.map(link => (
+                            <div key={link.name} className="space-y-4">
+                                <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                                    <Link
+                                        to={link.path}
+                                        onClick={() => !link.subLinks && setIsMobileMenuOpen(false)}
+                                        className="text-2xl font-serif text-slate-900"
+                                    >
+                                        {link.name}
+                                    </Link>
+                                    {link.subLinks && (
+                                        <button onClick={() => setActiveDropdown(activeDropdown === link.name ? null : link.name)}>
+                                            <ChevronDown size={20} className={`transition-transform ${activeDropdown === link.name ? 'rotate-180 text-pink-600' : ''}`} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {link.subLinks && activeDropdown === link.name && (
+                                    <div className="pl-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                                        {link.subLinks.map(sub => (
+                                            <Link
+                                                key={sub.name}
+                                                to={sub.path}
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                                className="block text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-pink-600"
+                                            >
+                                                {sub.name}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-auto pt-10">
+                        {!user && (
+                            <button
+                                onClick={() => { setIsMobileMenuOpen(false); onOpenAuth(); }}
+                                className="w-full bg-slate-900 text-white py-4 rounded-xl font-black uppercase tracking-widest"
+                            >
+                                Se connecter
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </header>
     );
 };
 

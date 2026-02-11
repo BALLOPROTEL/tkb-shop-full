@@ -1,243 +1,114 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, ShoppingBag, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Heart, ShoppingBag, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import api from '../../api'; // Instance Expert
+import { getGroupLabel, getDisplayCategory, isNewProduct, isPromo } from '../../utils/product';
+import { toast } from 'react-hot-toast';
+import { useFavorites } from '../../context/FavoritesContext';
 
-const ProductGrid = () => {
+export default function ProductGrid() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState('Tout');
-
-    // --- PAGINATION STATES ---
+    const [activeSubcategory, setActiveSubcategory] = useState('Tout');
     const [currentPage, setCurrentPage] = useState(1);
-    const productsPerPage = 8; // <--- C'est ici qu'on règle le nombre (8)
-
     const { addToCart } = useCart();
-    const location = useLocation();
-    const API_URL = "https://tkb-shop.onrender.com";
+    const { toggleFavorite, isFavorite } = useFavorites();
+    const productsPerPage = 16;
 
-    // Charger les produits
     useEffect(() => {
-        fetch(`${API_URL}/api/products`)
-            .then(res => res.json())
-            .then(data => setProducts(data))
-            .catch(err => console.error(err))
+        api.get('/api/products')
+            .then(res => setProducts(res.data))
+            .catch(() => toast.error("Erreur de chargement des produits"))
             .finally(() => setLoading(false));
     }, []);
 
-    // Activer le filtre via l'URL
-    useEffect(() => {
-        if (location.hash === '#sacs') setActiveCategory('Sac');
-        else if (location.hash === '#chaussures') setActiveCategory('Chaussure');
-        else if (location.hash === '#accessoires') setActiveCategory('Accessoire');
-        else if (location.hash === '#vetements') setActiveCategory('Vêtement');
-        else if (location.hash === '#promos') setActiveCategory('Promotions');
-    }, [location]);
+    const groupFiltered = products.filter(p => activeCategory === 'Tout' ? true : getGroupLabel(p) === activeCategory);
+    const availableSubcategories = Array.from(new Set(groupFiltered.map(p => p.subcategory).filter(Boolean)));
+    const filtered = groupFiltered.filter(p => activeSubcategory === 'Tout' ? true : p.subcategory === activeSubcategory);
+    const totalPages = Math.ceil(filtered.length / productsPerPage);
+    const currentItems = filtered.slice((currentPage - 1) * productsPerPage, currentPage * productsPerPage);
 
-    // IMPORTANT : Remettre à la page 1 quand on change de catégorie
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [activeCategory]);
-
-    // Liste des filtres
-    const categories = [
-        { id: 'Tout', label: 'Tout' },
-        { id: 'Sac', label: 'Sacs' },
-        { id: 'Chaussure', label: 'Chaussures' },
-        { id: 'Vêtement', label: 'Vêtements' },
-        { id: 'Accessoire', label: 'Accessoires' },
-        { id: 'Promotions', label: '🔥 Promos' }
-    ];
-
-    // 1. Filtrage
-    const filteredProducts = products.filter(product => {
-        if (activeCategory === 'Tout') return true;
-        if (activeCategory === 'Promotions') {
-            return product.oldPrice && product.oldPrice > product.price;
-        }
-        return product.category === activeCategory;
-    });
-
-    // 2. Pagination (Calcul mathématique)
-    const indexOfLastProduct = currentPage * productsPerPage;
-    const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-    const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
-    const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
-
-    // Fonction pour changer de page et scroller vers le haut de la grille
-    const paginate = (pageNumber) => {
-        setCurrentPage(pageNumber);
-        document.getElementById('collection').scrollIntoView({ behavior: 'smooth' });
-    };
-
-    if (loading) return <div className="text-center py-20 text-slate-500">Chargement de la collection...</div>;
+    if (loading) return <div className="h-96 flex items-center justify-center animate-pulse text-pink-400 font-serif">TKB COLLECTION...</div>;
 
     return (
-        <section id="collection" className="py-16 bg-white min-h-screen">
+        <section className="py-20 bg-white">
             <div className="container mx-auto px-6">
-
-                {/* TITRE */}
-                <h2 className="text-3xl font-extrabold text-slate-900 mb-6 text-center uppercase tracking-wider font-serif">
-                    Nos Collections
-                </h2>
-
-                {/* MENU DE FILTRES */}
-                <div className="flex flex-wrap justify-center gap-3 mb-12">
-                    {categories.map((cat) => (
-                        <button
-                            key={cat.id}
-                            onClick={() => setActiveCategory(cat.id)}
-                            className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 border ${activeCategory === cat.id
-                                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg scale-105'
-                                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                                }`}
-                        >
-                            {cat.label}
+                <div className="flex flex-wrap justify-center gap-4 mb-16">
+                    {['Tout', 'Sacs', 'Chaussures', 'Vêtements', 'Accessoires'].map(cat => (
+                        <button key={cat} onClick={() => { setActiveCategory(cat); setActiveSubcategory('Tout'); setCurrentPage(1); }}
+                            className={`px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all ${activeCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                            {cat}
                         </button>
                     ))}
                 </div>
 
-                {/* GRILLE PRODUITS (On affiche currentProducts, pas filteredProducts) */}
-                {currentProducts.length === 0 ? (
-                    <div className="text-center py-20 bg-slate-50 rounded-3xl">
-                        <Filter size={48} className="mx-auto text-slate-300 mb-4" />
-                        <p className="text-slate-500">Aucun article trouvé dans cette catégorie.</p>
-                        <button onClick={() => setActiveCategory('Tout')} className="text-blue-600 font-bold mt-2 hover:underline">Voir tout le catalogue</button>
+                {activeCategory !== 'Tout' && availableSubcategories.length > 0 && (
+                    <div className="flex flex-wrap justify-center gap-3 mb-12">
+                        <button onClick={() => { setActiveSubcategory('Tout'); setCurrentPage(1); }}
+                            className={`px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${activeSubcategory === 'Tout' ? 'bg-pink-600 text-white' : 'bg-pink-50 text-pink-600 hover:bg-pink-100'}`}>
+                            Tous
+                        </button>
+                        {availableSubcategories.map(sub => (
+                            <button key={sub} onClick={() => { setActiveSubcategory(sub); setCurrentPage(1); }}
+                                className={`px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${activeSubcategory === sub ? 'bg-pink-600 text-white' : 'bg-pink-50 text-pink-600 hover:bg-pink-100'}`}>
+                                {sub}
+                            </button>
+                        ))}
                     </div>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                            {currentProducts.map((product) => (
-                                <ProductCard key={product.id} product={product} addToCart={addToCart} />
-                            ))}
-                        </div>
-
-                        {/* --- BARRE DE PAGINATION --- */}
-                        {totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-2 mt-16">
-                                {/* Bouton Précédent */}
-                                <button
-                                    onClick={() => paginate(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="p-2 rounded-full border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <ChevronLeft size={20} />
-                                </button>
-
-                                {/* Numéros de page */}
-                                {[...Array(totalPages)].map((_, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => paginate(index + 1)}
-                                        className={`w-10 h-10 rounded-full font-bold text-sm transition-all ${currentPage === index + 1
-                                                ? 'bg-slate-900 text-white shadow-md scale-110'
-                                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                                            }`}
-                                    >
-                                        {index + 1}
-                                    </button>
-                                ))}
-
-                                {/* Bouton Suivant */}
-                                <button
-                                    onClick={() => paginate(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="p-2 rounded-full border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <ChevronRight size={20} />
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Info page */}
-                        <p className="text-center text-xs text-slate-400 mt-4">
-                            Affichage de {currentProducts.length} articles sur {filteredProducts.length}
-                        </p>
-                    </>
                 )}
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+                    {currentItems.map(product => (
+                        <div key={product.id} className="group flex flex-col gap-4">
+                            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-slate-50 shadow-sm">
+                                <div className="absolute top-3 left-3 z-20 flex flex-col gap-1">
+                                    {isNewProduct(product) && <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Nouveau</span>}
+                                    {isPromo(product) && <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Promo</span>}
+                                    <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-900">
+                                        {getGroupLabel(product)}
+                                    </span>
+                                    {product.subcategory && (
+                                        <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-pink-600">
+                                            {product.subcategory}
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(product); }}
+                                    className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur w-9 h-9 rounded-full flex items-center justify-center shadow"
+                                    aria-label="Ajouter aux favoris"
+                                >
+                                    <Heart className={isFavorite(product.id) ? 'text-pink-600 fill-pink-600' : 'text-slate-700'} size={16} />
+                                </button>
+                                <Link to={`/product/${product.id}`}>
+                                    <img src={product.image} alt={product.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                </Link>
+                                <button onClick={() => addToCart(product, 1)} className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur py-3 rounded-xl font-bold text-[10px] uppercase tracking-tighter opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all flex items-center justify-center gap-2">
+                                    <ShoppingBag size={14} /> Ajouter au panier
+                                </button>
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight truncate">{product.name}</h3>
+                                <p className="text-[9px] text-pink-400 font-bold uppercase tracking-[0.2em]">{getDisplayCategory(product)}</p>
+                                <div className="flex items-center justify-center gap-2">
+                                    <p className="text-pink-600 font-serif font-bold mt-1">{product.price.toLocaleString()} F CFA</p>
+                                    {isPromo(product) && <p className="text-xs text-slate-300 line-through mt-1">{product.oldPrice.toLocaleString()} F CFA</p>}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {totalPages > 1 && (
+                    <div className="mt-20 flex justify-center items-center gap-4">
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(c => c - 1)} className="p-3 border rounded-full disabled:opacity-20"><ChevronLeft /></button>
+                        <span className="text-sm font-bold italic text-slate-400">Page {currentPage} / {totalPages}</span>
+                        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(c => c + 1)} className="p-3 border rounded-full disabled:opacity-20"><ChevronRight /></button>
+                    </div>
+                )}
             </div>
         </section>
     );
-};
-
-// --- COMPOSANT CARTE (Inchangé) ---
-const ProductCard = ({ product, addToCart }) => {
-    const [isHovered, setIsHovered] = useState(false);
-    const [isFavorite, setIsFavorite] = useState(false);
-
-    const oldPrice = product.oldPrice || (product.price * 1.2);
-    const discount = product.oldPrice && product.oldPrice > product.price
-        ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
-        : 0;
-
-    const isPromo = discount > 0;
-    const isOutOfStock = product.stock === 0;
-
-    // On simule des couleurs pour le style si la liste est vide, sinon on prend les vraies
-    const displayColors = product.colors && product.colors.length > 0
-        ? product.colors
-        : ['#1a1a1a', '#e5e5e5', '#d4a373'];
-
-    return (
-        <div
-            className="group relative flex flex-col gap-3"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-        >
-            <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100">
-                <Link to={`/products/${product.id}`}>
-                    <img
-                        src={product.image}
-                        alt={product.name}
-                        className={`h-full w-full object-cover transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'} ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
-                    />
-                </Link>
-
-                <div className="absolute top-3 left-3 flex flex-col gap-2">
-                    {isOutOfStock && <span className="bg-black text-white text-[10px] font-bold px-2 py-1 uppercase tracking-widest shadow-md">Épuisé</span>}
-                    {!isOutOfStock && isPromo && <span className="bg-pink-600 text-white text-[10px] font-bold px-2 py-1 shadow-md">-{discount}%</span>}
-                </div>
-
-                <button
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-full hover:bg-white transition-all shadow-sm group-hover:scale-110"
-                >
-                    <Heart size={16} className={isFavorite ? "fill-red-500 text-red-500" : "text-slate-900"} />
-                </button>
-
-                {!isOutOfStock && (
-                    <div className={`absolute bottom-4 left-0 right-0 px-4 transition-all duration-300 ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-                        <button
-                            onClick={() => addToCart(product, 1)}
-                            className="w-full bg-white text-slate-900 py-3 rounded-lg font-bold text-xs uppercase tracking-wider shadow-xl hover:bg-slate-900 hover:text-white transition-colors flex items-center justify-center gap-2"
-                        >
-                            <ShoppingBag size={14} /> Ajouter
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            <div>
-                <h3 className="font-medium text-slate-900 uppercase text-sm tracking-wide truncate">
-                    <Link to={`/products/${product.id}`}>{product.name}</Link>
-                </h3>
-
-                <div className="flex items-center gap-3 mt-1 mb-2">
-                    <span className="font-bold text-slate-900">{product.price.toLocaleString()} F CFA</span>
-                    {isPromo && <span className="text-xs text-gray-400 line-through">{product.oldPrice.toLocaleString()} F CFA</span>}
-                </div>
-
-                <div className="flex gap-2">
-                    {displayColors.slice(0, 4).map((c, i) => (
-                        <div key={i} className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: c }}></div>
-                    ))}
-                    {displayColors.length > 4 && <span className="text-[10px] text-gray-400">+{displayColors.length - 4}</span>}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default ProductGrid;
+}

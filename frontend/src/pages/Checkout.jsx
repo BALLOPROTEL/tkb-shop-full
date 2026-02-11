@@ -1,226 +1,165 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { ShieldCheck, ArrowLeft, Loader, User, ChevronRight, Lock } from 'lucide-react';
+import api from '../api';
+import { loadStripe } from '@stripe/stripe-js';
+import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
+import { CreditCard, ShieldCheck, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { API_BASE_URL } from '../config';
-import AuthModal from '../components/auth/AuthModal';
-import PayPalButton from '../components/common/PayPalButton';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+const PAYPAL_CURRENCY = import.meta.env.VITE_PAYPAL_CURRENCY || "EUR";
+const PAYPAL_FX_RATE = Number(import.meta.env.VITE_PAYPAL_FX_RATE || 655);
 
 const Checkout = () => {
     const { cart, cartTotal, clearCart } = useCart();
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user'));
-
-    // --- ÉTATS ---
-    const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
-    const [payMode, setPayMode] = useState('kkiapay');
-    const [showLoginModal, setShowLoginModal] = useState(false);
-    const [isRedirecting, setIsRedirecting] = useState(false);
-    // 👇 INITIALISATION UNIQUE (Règle le problème du texte "tkb_shop" qui revient)
-    const [formData, setFormData] = useState({
-        firstName: user?.name?.split(' ')[0] || '',
-        lastName: '',
-        address: '',
-        city: '',
-        phone: '',
-        email: user?.email || ''
-    });
-
-    const shippingCost = cartTotal > 5000 ? 0 : 2000;
-    const finalTotal = cartTotal + shippingCost;
-
-    // Redirection si panier vide
-    useEffect(() => {
-        // On ne redirige vers l'accueil QUE si le panier est vide 
-        // ET qu'on n'est pas en train de finaliser une commande
-        if (cart.length === 0 && !isRedirecting) {
-            navigate('/');
+    const [address, setAddress] = useState({ fullName: '', street: '', city: '', phone: '' });
+    const [serverTotal, setServerTotal] = useState(null);
+    const isAddressValid = address.fullName && address.street && address.city && address.phone;
+    const fetchQuote = async () => {
+        try {
+            const res = await api.post('/api/orders/quote', {
+                items: cart.map(i => ({
+                    product: String(i.id),
+                    quantity: i.quantity,
+                    size: i.selectedSize || "Unique"
+                }))
+            });
+            const total = res?.data?.totalAmount;
+            if (typeof total === 'number') {
+                setServerTotal(total);
+                return total;
+            }
+        } catch (err) {
+            console.error("Erreur quote:", err.response?.data || err.message);
+            toast.error("Impossible de valider le panier");
+        } finally {
         }
-    }, [cart, navigate, isRedirecting]);
-
-    // --- LOGIQUE DE PAIEMENT ---
-    const handleKkiapay = () => {
-        if (!formData.address || !formData.phone) return toast.error("Veuillez remplir les informations de livraison");
-
-        window.openKkiapayWidget({
-            amount: finalTotal,
-            position: "center",
-            callback: "/payment-success",
-            data: "Commande TKB Shop",
-            theme: "#000000",
-            sandbox: true, // METTRE FALSE EN PROD
-            key: "e258b7a0e01711f08e42450b5f9eeaf9", // TA CLÉ PUBLIQUE (PK)
-        });
-
-        window.addKkiapayListener('success', (response) => {
-            saveOrder(response.transactionId);
-        });
+        return null;
     };
 
-    const saveOrder = async (transactionId) => {
+
+    const handleStripePayment = async () => {
+        if (!isAddressValid) {
+            return toast.error("Veuillez remplir Nom, Adresse, Ville et Téléphone");
+        }
+
         setLoading(true);
-        setIsRedirecting(true);
         try {
-            const userId = user.id || user._id;
+            // 1. CRÉATION COMMANDE
+            const orderPayload = {
+                items: cart.map(i => ({
+                    product: String(i.id),
+                    name: i.name,
+                    quantity: i.quantity,
+                    price: parseFloat(i.price),
+                    image: i.image,
+                    size: i.selectedSize || "Unique"
+                })),
+                totalAmount: parseFloat(serverTotal ?? cartTotal),
+                paymentMethod: 'Stripe',
+                shippingAddress: `${address.fullName}, ${address.street}, ${address.city}`,
+                phone: address.phone
+            };
 
-            // 1. On prépare l'enregistrement de chaque article du panier
-            const orderPromises = cart.map(item => {
-                return fetch(`${API_BASE_URL}/api/orders`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: userId,
-                        productId: item.id,
-                        productName: item.name,
-                        price: item.price,
-                        quantity: item.quantity,
-                        totalPrice: item.price * item.quantity,
-                        address: `${formData.address}, ${formData.city} (Tél: ${formData.phone})`,
-                        status: 'Payé',
-                        paymentId: transactionId
-                    })
-                });
-            });
+            const orderRes = await api.post('/api/orders', orderPayload);
+            const orderId = orderRes.data.id;
 
-            // 2. On attend que tout soit enregistré sur Render
-            await Promise.all(orderPromises);
+            // 2. CRÉATION SESSION STRIPE
+            const stripeRes = await api.post('/api/payments/create-stripe-session', { orderId });
 
-            // 3. On vide le panier
-            clearCart();
-
-            // 4. ON REDIRIGE VERS LA PAGE DE SUCCÈS (Le point critique)
-            // Assurez-vous que cette route existe dans votre App.jsx
-            toast.success("Paiement validé !");
-            navigate('/payment-success');
+            const stripe = await stripePromise;
+            await stripe.redirectToCheckout({ sessionId: stripeRes.data.id });
 
         } catch (err) {
-            console.error("Erreur saveOrder:", err);
-            toast.error("Erreur lors de l'enregistrement de la commande.");
-            // En cas d'erreur, on reste sur la page pour que l'utilisateur puisse nous contacter
+            console.error("Erreur détaillée:", err.response?.data || err.message);
+            toast.error("Erreur d'initialisation du paiement Stripe");
         } finally {
             setLoading(false);
         }
     };
 
-    if (!user) {
-        return (
-            <div className="min-h-screen bg-white pt-40 flex flex-col items-center p-6 text-center">
-                <User size={48} className="text-slate-200 mb-4" />
-                <h2 className="text-2xl font-serif mb-6 uppercase tracking-widest">Connexion requise</h2>
-                <button onClick={() => setShowLoginModal(true)} className="px-12 py-4 bg-black text-white text-xs font-bold uppercase tracking-widest">Se Connecter</button>
-                <AuthModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} initialMode="login" />
-            </div>
-        );
-    }
-
     return (
-        <div className="min-h-screen bg-white text-slate-900 pt-28 pb-20">
-            <div className="container mx-auto px-6 max-w-7xl">
+        <div className="min-h-screen bg-white pt-32 pb-20">
+            <div className="container mx-auto px-6 max-w-5xl">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
 
-                {/* ÉTAPES STYLE MK */}
-                <div className="flex flex-col items-center mb-16 border-b border-slate-100 pb-8">
-                    <h1 className="text-2xl font-serif tracking-[0.2em] uppercase mb-6">Finaliser l'achat</h1>
-                    <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest">
-                        <span className={step === 1 ? "border-b-2 border-black pb-1" : "text-slate-400"}>1. Expédition</span>
-                        <ChevronRight size={12} className="text-slate-300" />
-                        <span className={step === 2 ? "border-b-2 border-black pb-1" : "text-slate-400"}>2. Paiement</span>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
-
-                    {/* GAUCHE : FORMULAIRE */}
-                    <div className="lg:col-span-7">
-                        {step === 1 ? (
-                            <div className="animate-in fade-in duration-500">
-                                <h2 className="text-sm font-bold uppercase mb-8 tracking-widest">Adresse d'expédition</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                                    <input type="text" placeholder="PRÉNOM" className="border-b border-slate-200 py-3 outline-none focus:border-black text-sm uppercase" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
-                                    <input type="text" placeholder="NOM DE FAMILLE" className="border-b border-slate-200 py-3 outline-none focus:border-black text-sm uppercase" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
-                                    <input type="text" placeholder="ADRESSE COMPLÈTE" className="md:col-span-2 border-b border-slate-200 py-3 outline-none focus:border-black text-sm uppercase" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
-                                    <input type="text" placeholder="VILLE" className="border-b border-slate-200 py-3 outline-none focus:border-black text-sm uppercase" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
-                                    <input type="tel" placeholder="NUMÉRO DE TÉLÉPHONE" className="border-b border-slate-200 py-3 outline-none focus:border-black text-sm uppercase" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-                                </div>
-                                <button onClick={() => setStep(2)} className="w-full bg-black text-white font-bold py-5 mt-12 uppercase tracking-[0.2em] text-[10px] hover:bg-slate-800 transition-all">
-                                    Continuer vers le paiement
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="animate-in fade-in duration-500">
-                                <h2 className="text-sm font-bold uppercase mb-8 tracking-widest flex items-center gap-2">
-                                    <Lock size={14} /> Mode de règlement
-                                </h2>
-                                <div className="space-y-4">
-                                    <div onClick={() => setPayMode('kkiapay')} className={`p-5 border cursor-pointer flex items-center gap-4 transition-all ${payMode === 'kkiapay' ? 'border-black bg-slate-50' : 'border-slate-100'}`}>
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${payMode === 'kkiapay' ? 'border-black' : 'border-slate-300'}`}>
-                                            {payMode === 'kkiapay' && <div className="w-2 h-2 bg-black rounded-full" />}
-                                        </div>
-                                        <span className="text-xs font-bold uppercase tracking-widest">Mobile Money / Carte (Afrique)</span>
-                                    </div>
-                                    <div onClick={() => setPayMode('paypal')} className={`p-5 border cursor-pointer flex items-center gap-4 transition-all ${payMode === 'paypal' ? 'border-black bg-slate-50' : 'border-slate-100'}`}>
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${payMode === 'paypal' ? 'border-black' : 'border-slate-300'}`}>
-                                            {payMode === 'paypal' && <div className="w-2 h-2 bg-black rounded-full" />}
-                                        </div>
-                                        <span className="text-xs font-bold uppercase tracking-widest">PayPal / International</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-10">
-                                    {payMode === 'kkiapay' ? (
-                                        <button onClick={handleKkiapay} className="w-full bg-black text-white font-bold py-5 uppercase tracking-[0.2em] text-[10px]">
-                                            Payer maintenant
-                                        </button>
-                                    ) : (
-                                        <PayPalButton amount={finalTotal} onSuccess={(tx) => saveOrder(tx)} />
-                                    )}
-                                </div>
-                                <button onClick={() => setStep(1)} className="mt-8 text-[10px] font-bold uppercase underline tracking-widest flex items-center gap-2">
-                                    <ArrowLeft size={12} /> Retour à l'expédition
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* DROITE : RÉSUMÉ (STICKY) */}
-                    <div className="lg:col-span-5">
-                        <div className="bg-slate-50 p-8 sticky top-32 border border-slate-100">
-                            <h3 className="text-[10px] font-bold uppercase tracking-widest mb-8 border-b border-slate-200 pb-4">
-                                Résumé de la commande ({cart.length})
-                            </h3>
-                            <div className="space-y-6 mb-8 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                                {cart.map((item, idx) => (
-                                    <div key={idx} className="flex gap-4">
-                                        <div className="w-16 h-20 bg-white border border-slate-200 shrink-0">
-                                            <img src={item.images?.[0] || item.image} className="w-full h-full object-cover" alt="" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-[10px] font-bold uppercase mb-1">{item.name}</p>
-                                            <p className="text-[9px] text-slate-400 uppercase mb-2">Quantité : {item.quantity}</p>
-                                            <p className="text-xs font-bold">{item.price.toLocaleString()} F CFA</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="border-t border-slate-200 pt-6 space-y-4 text-[11px] uppercase tracking-wider">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Sous-total</span>
-                                    <span className="font-bold">{cartTotal.toLocaleString()} F</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Livraison</span>
-                                    <span className="font-bold">{shippingCost === 0 ? "Gratuit" : shippingCost + " F"}</span>
-                                </div>
-                                <div className="flex justify-between text-sm font-black pt-4 border-t border-slate-200">
-                                    <span>Total</span>
-                                    <span>{finalTotal.toLocaleString()} F CFA</span>
-                                </div>
-                            </div>
-                            <div className="mt-8 flex items-center gap-2 text-[9px] text-slate-400 uppercase tracking-[0.2em] justify-center">
-                                <ShieldCheck size={12} className="text-green-500" /> Paiement sécurisé
+                    {/* LIVRAISON */}
+                    <div className="space-y-10 animate-in fade-in slide-in-from-left duration-700">
+                        <h2 className="text-3xl font-serif flex items-center gap-3">
+                            <MapPin className="text-pink-400" /> Livraison
+                        </h2>
+                        <div className="space-y-6">
+                            <input type="text" placeholder="Nom complet" className="w-full border-b p-4 outline-none focus:border-pink-500 bg-pink-50/10"
+                                onChange={(e) => setAddress({ ...address, fullName: e.target.value })} />
+                            <input type="text" placeholder="Adresse complète" className="w-full border-b p-4 outline-none focus:border-pink-500 bg-pink-50/10"
+                                onChange={(e) => setAddress({ ...address, street: e.target.value })} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <input type="text" placeholder="Ville" className="w-full border-b p-4 outline-none focus:border-pink-500 bg-pink-50/10"
+                                    onChange={(e) => setAddress({ ...address, city: e.target.value })} />
+                                <input type="text" placeholder="Téléphone" className="w-full border-b p-4 outline-none focus:border-pink-500 bg-pink-50/10"
+                                    onChange={(e) => setAddress({ ...address, phone: e.target.value })} />
                             </div>
                         </div>
+                    </div>
+
+                    {/* RÉCAPITULATIF & PAIEMENT */}
+                    <div className="bg-slate-50 p-8 rounded-3xl space-y-8 h-fit shadow-sm animate-in fade-in slide-in-from-right duration-700">
+                        <div className="flex justify-between items-end border-b pb-4">
+                            <span className="text-sm text-slate-500 uppercase font-bold tracking-widest">Total à régler</span>
+                            <span className="text-2xl font-serif text-pink-600">{(serverTotal ?? cartTotal).toLocaleString()} F CFA</span>
+                        </div>
+
+                        <button onClick={handleStripePayment} disabled={loading}
+                            className="w-full bg-slate-900 text-white p-5 rounded-2xl flex justify-between items-center hover:bg-pink-600 transition-all shadow-xl">
+                            <span className="flex items-center gap-2 font-bold uppercase text-[10px] tracking-widest">
+                                <CreditCard size={18} /> Payer par Carte
+                            </span>
+                            {loading ? <Loader2 className="animate-spin" /> : <ShieldCheck size={18} />}
+                        </button>
+
+                        <div className="relative text-center py-2">
+                            <span className="bg-slate-50 px-4 text-[9px] uppercase text-slate-400 relative z-10 font-bold">Ou utiliser PayPal</span>
+                            <div className="absolute top-1/2 left-0 w-full border-t border-slate-200"></div>
+                        </div>
+
+                        <PayPalScriptProvider options={{ "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID, currency: PAYPAL_CURRENCY }}>
+                            <PayPalButtons
+                                style={{ layout: "vertical", shape: "pill" }}
+                                onClick={(data, actions) => {
+                                    if (!isAddressValid) {
+                                        toast.error("Veuillez remplir Nom, Adresse, Ville et Téléphone");
+                                        return actions.reject();
+                                    }
+                                    return actions.resolve();
+                                }}
+                                createOrder={(data, actions) => {
+                                    return fetchQuote().then((total) => {
+                                        const amount = total ?? cartTotal;
+                                        return actions.order.create({
+                                            purchase_units: [{ amount: { value: (amount / PAYPAL_FX_RATE).toFixed(2) } }]
+                                        });
+                                    });
+                                }}
+                                onApprove={async (data, actions) => {
+                                    const order = await actions.order.capture();
+                                    await api.post('/api/orders', {
+                                        items: cart.map(i => ({ product: i.id, name: i.name, quantity: i.quantity, price: i.price, image: i.image })),
+                                        totalAmount: serverTotal ?? cartTotal,
+                                        paymentMethod: 'PayPal',
+                                        paymentId: order?.id || data.orderID,
+                                        status: 'Payé',
+                                        shippingAddress: `${address.fullName}, ${address.street}, ${address.city}`,
+                                        phone: address.phone
+                                    });
+                                    clearCart();
+                                    navigate('/payment-success');
+                                }}
+                                onError={() => toast.error("Échec du paiement PayPal")}
+                            />
+                        </PayPalScriptProvider>
                     </div>
                 </div>
             </div>
