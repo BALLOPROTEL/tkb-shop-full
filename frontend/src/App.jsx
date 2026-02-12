@@ -18,6 +18,7 @@ import UserProfile from './pages/UserProfile';
 import PaymentSuccess from './pages/PaymentSuccess';
 import CategoryPage from './pages/CategoryPage';
 import Favorites from './pages/Favorites';
+import Contact from './pages/legal/Contact';
 
 import AdminLayout from './components/admin/AdminLayout';
 import DashboardHome from './pages/admin/DashboardHome';
@@ -53,6 +54,7 @@ const AppContent = () => {
           <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
           <Route path="/favorites" element={<Favorites />} />
+          <Route path="/contact" element={<Contact />} />
 
           <Route path="/admin" element={<ProtectedRoute isAdmin={true}><AdminLayout><DashboardHome /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/products" element={<ProtectedRoute isAdmin={true}><AdminLayout><AdminProducts /></AdminLayout></ProtectedRoute>} />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     User,
     ShoppingBag,
@@ -8,7 +8,10 @@ import {
     Menu,
     X,
     ChevronDown,
-    Heart
+    ChevronRight,
+    Heart,
+    Search,
+    MapPin
 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import api from '../../api'; // Instance Axios Expert
@@ -26,6 +29,7 @@ const Navbar = ({ onOpenAuth }) => {
     const [bannerText, setBannerText] = useState("CHARGEMENT...");
 
     const navigate = useNavigate();
+    const location = useLocation();
     const { cartCount } = useCart();
     const { favoritesCount } = useFavorites();
     const profileRef = useRef(null);
@@ -42,10 +46,10 @@ const Navbar = ({ onOpenAuth }) => {
         };
         document.addEventListener('mousedown', handleClickOutside);
 
-        // RÉCUPÉRATION DU MESSAGE DYNAMIQUE (Backend Python)
+        // RECUPERATION DU MESSAGE DYNAMIQUE (Backend Python)
         api.get('/api/settings')
             .then(res => setBannerText(res.data.bannerText || "BIENVENUE CHEZ TKB SHOP"))
-            .catch(() => setBannerText("LIVRAISON OFFERTE DÈS 50.000 FCFA"));
+            .catch(() => setBannerText("LIVRAISON OFFERTE DES 50.000 FCFA"));
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
@@ -61,9 +65,26 @@ const Navbar = ({ onOpenAuth }) => {
         window.location.reload();
     };
 
-    // 2. STRUCTURE COMPLÈTE DES CATÉGORIES (Aucune coupe)
+    const focusHomeSearch = () => {
+        const input = document.getElementById('home-search');
+        if (input) {
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            input.focus();
+        }
+    };
+
+    const handleSearchClick = () => {
+        if (location.pathname !== '/') {
+            navigate('/');
+            setTimeout(() => focusHomeSearch(), 250);
+            return;
+        }
+        focusHomeSearch();
+    };
+
+    // 2. STRUCTURE COMPLETE DES CATEGORIES (Aucune coupe)
     const navLinks = [
-        { name: 'Nouveautés', path: '/' },
+        { name: 'Nouveautes', path: '/' },
         { name: 'Sacs', path: '/shop/sacs' },
         {
             name: 'Chaussures',
@@ -71,7 +92,7 @@ const Navbar = ({ onOpenAuth }) => {
             subLinks: [
                 { name: 'Femme', path: '/shop/chaussures/femme' },
                 { name: 'Homme', path: '/shop/chaussures/homme' },
-                { name: 'Bébé', path: '/shop/chaussures/bebe' }
+                { name: 'Bebe', path: '/shop/chaussures/bebe' }
             ]
         },
         {
@@ -84,7 +105,7 @@ const Navbar = ({ onOpenAuth }) => {
             ]
         },
         {
-            name: 'Vêtements',
+            name: 'Vetements',
             path: '/shop/vetements',
             subLinks: [
                 { name: 'Robes', path: '/shop/vetements/robes' },
@@ -106,59 +127,39 @@ const Navbar = ({ onOpenAuth }) => {
                     ? 'bg-white/95 backdrop-blur-md py-3 sm:py-4 shadow-sm border-b border-slate-100'
                     : 'bg-transparent py-4 sm:py-7 border-b border-transparent'
                 }`}>
-                <div className="container mx-auto px-4 sm:px-6 lg:px-12 flex items-center justify-between">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-12 grid grid-cols-[1fr_auto_1fr] items-center">
 
-                    {/* GAUCHE : Logo & Hamburger */}
-                    <div className="flex items-center gap-6 sm:gap-8">
-                        <button className="lg:hidden text-slate-900" onClick={() => setIsMobileMenuOpen(true)}>
-                            <Menu size={24} strokeWidth={1.5} />
+                    {/* GAUCHE : Menu */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            className="flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-bold text-slate-900 hover:text-pink-600 transition-colors"
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            aria-label="Ouvrir le menu"
+                        >
+                            <Menu size={22} strokeWidth={1.5} />
+                            <span className="hidden sm:inline">Menu</span>
                         </button>
+                    </div>
 
+                    {/* CENTRE : Logo */}
+                    <div className="flex items-center justify-center">
                         <Link to="/" className="group">
-                            <span className="font-serif text-2xl md:text-3xl tracking-tighter text-slate-900">
+                            <span className="font-serif text-2xl sm:text-3xl tracking-tighter text-slate-900">
                                 TKB<span className="font-light italic text-pink-600 group-hover:text-pink-400 transition-colors">_</span>SHOP
                             </span>
                         </Link>
                     </div>
 
-                    {/* MILIEU : Liens avec Dropdowns Sophistiqués */}
-                    <div className="hidden lg:flex items-center gap-6 xl:gap-10">
-                        {navLinks.map(link => (
-                            <div
-                                key={link.name}
-                                className="relative group"
-                                onMouseEnter={() => setActiveDropdown(link.name)}
-                                onMouseLeave={() => setActiveDropdown(null)}
-                            >
-                                <Link
-                                    to={link.path}
-                                    className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.25em] font-bold text-slate-900 hover:text-pink-600 transition-colors py-2"
-                                >
-                                    {link.name}
-                                    {link.subLinks && <ChevronDown size={10} className={`transition-transform duration-300 ${activeDropdown === link.name ? 'rotate-180' : ''}`} />}
-                                </Link>
-
-                                {link.subLinks && activeDropdown === link.name && (
-                                    <div className="absolute left-0 pt-4 w-56 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="bg-white border border-slate-100 shadow-2xl py-6 px-2 rounded-sm">
-                                            {link.subLinks.map(sub => (
-                                                <Link
-                                                    key={sub.name}
-                                                    to={sub.path}
-                                                    className="block px-6 py-3 text-[9px] uppercase tracking-[0.2em] text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-all font-bold"
-                                                >
-                                                    {sub.name}
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
                     {/* DROITE : Actions Utilisateur */}
-                    <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="flex items-center justify-end gap-2 sm:gap-4">
+                        <button
+                            onClick={handleSearchClick}
+                            className="p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
+                            aria-label="Rechercher"
+                        >
+                            <Search size={18} strokeWidth={1.5} />
+                        </button>
+
                         <div className="relative" ref={profileRef}>
                             {user ? (
                                 <button
@@ -191,7 +192,7 @@ const Navbar = ({ onOpenAuth }) => {
                                     <Link to="/profile" onClick={() => setIsProfileOpen(false)} className="block px-6 py-3 text-[10px] uppercase font-bold text-slate-700 hover:bg-slate-50 tracking-widest">Mon Profil</Link>
                                     <Link to="/my-orders" onClick={() => setIsProfileOpen(false)} className="block px-6 py-3 text-[10px] uppercase font-bold text-slate-700 hover:bg-slate-50 tracking-widest">Mes Achats</Link>
                                     <button onClick={handleLogout} className="w-full flex items-center gap-3 px-6 py-3 text-[10px] uppercase font-black text-red-500 hover:bg-red-50 border-t border-slate-50 mt-2">
-                                        <LogOut size={14} /> Déconnexion
+                                        <LogOut size={14} /> Deconnexion
                                     </button>
                                 </div>
                             )}
@@ -218,60 +219,113 @@ const Navbar = ({ onOpenAuth }) => {
                 </div>
             </nav>
 
-            {/* MENU MOBILE PLEIN ÉCRAN */}
+            {/* MENU MOBILE (STYLE MK) */}
             {isMobileMenuOpen && (
-                <div className="fixed inset-0 bg-white z-[60] flex flex-col p-6 sm:p-10 overflow-y-auto animate-in slide-in-from-left duration-500">
-                    <div className="flex justify-end mb-10">
-                        <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-slate-50 rounded-full">
-                            <X size={28} strokeWidth={1.5} />
-                        </button>
-                    </div>
+                <div className="fixed inset-0 z-[60]">
+                    <div
+                        className="absolute inset-0 bg-black/40"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                    <div className="absolute inset-y-0 left-0 w-[86vw] max-w-[420px] bg-white shadow-2xl border-r border-slate-200 flex flex-col p-6 sm:p-8 overflow-y-auto animate-in slide-in-from-left duration-500">
+                        <div className="flex items-center gap-3 mb-8">
+                            <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-slate-50 rounded-full">
+                                <X size={20} strokeWidth={1.5} />
+                            </button>
+                            <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-slate-700">Close</span>
+                        </div>
 
-                    <div className="space-y-6 sm:space-y-8">
-                        {navLinks.map(link => (
-                            <div key={link.name} className="space-y-4">
-                                <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                                    <Link
-                                        to={link.path}
-                                        onClick={() => !link.subLinks && setIsMobileMenuOpen(false)}
-                                        className="text-xl sm:text-2xl font-serif text-slate-900"
-                                    >
-                                        {link.name}
-                                    </Link>
-                                    {link.subLinks && (
-                                        <button onClick={() => setActiveDropdown(activeDropdown === link.name ? null : link.name)}>
-                                            <ChevronDown size={20} className={`transition-transform ${activeDropdown === link.name ? 'rotate-180 text-pink-600' : ''}`} />
-                                        </button>
+                        {/* Quick actions */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+                            <Link
+                                to="/favorites"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="border border-slate-200 rounded-2xl px-3 py-4 flex flex-col items-center gap-2 text-slate-900 hover:border-pink-400 transition-colors"
+                            >
+                                <Heart size={20} />
+                                <span className="text-[11px] font-semibold">Favoris</span>
+                            </Link>
+                            <Link
+                                to="/my-orders"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="border border-slate-200 rounded-2xl px-3 py-4 flex flex-col items-center gap-2 text-slate-900 hover:border-pink-400 transition-colors"
+                            >
+                                <ShoppingBag size={20} />
+                                <span className="text-[11px] font-semibold text-center">Suivre ma commande</span>
+                            </Link>
+                            {user ? (
+                                <Link
+                                    to="/profile"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="border border-slate-200 rounded-2xl px-3 py-4 flex flex-col items-center gap-2 text-slate-900 hover:border-pink-400 transition-colors"
+                                >
+                                    <User size={20} />
+                                    <span className="text-[11px] font-semibold">Mon compte</span>
+                                </Link>
+                            ) : (
+                                <button
+                                    onClick={() => { setIsMobileMenuOpen(false); onOpenAuth(); }}
+                                    className="border border-slate-200 rounded-2xl px-3 py-4 flex flex-col items-center gap-2 text-slate-900 hover:border-pink-400 transition-colors"
+                                >
+                                    <User size={20} />
+                                    <span className="text-[11px] font-semibold">Se connecter</span>
+                                </button>
+                            )}
+                            <Link
+                                to="/contact"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="border border-slate-200 rounded-2xl px-3 py-4 flex flex-col items-center gap-2 text-slate-900 hover:border-pink-400 transition-colors"
+                            >
+                                <MapPin size={20} />
+                                <span className="text-[11px] font-semibold text-center">Trouver une boutique</span>
+                            </Link>
+                        </div>
+
+                        <div className="space-y-5">
+                            {navLinks.map(link => (
+                                <div key={link.name} className="space-y-3">
+                                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                        <Link
+                                            to={link.path}
+                                            onClick={() => !link.subLinks && setIsMobileMenuOpen(false)}
+                                            className="text-lg font-semibold text-slate-900"
+                                        >
+                                            {link.name}
+                                        </Link>
+                                        {link.subLinks ? (
+                                            <button onClick={() => setActiveDropdown(activeDropdown === link.name ? null : link.name)}>
+                                                {activeDropdown === link.name ? (
+                                                    <ChevronDown size={18} className="text-slate-700" />
+                                                ) : (
+                                                    <ChevronRight size={18} className="text-slate-700" />
+                                                )}
+                                            </button>
+                                        ) : null}
+                                    </div>
+
+                                    {link.subLinks && activeDropdown === link.name && (
+                                        <div className="pl-4 space-y-3 animate-in fade-in slide-in-from-top-2">
+                                            {link.subLinks.map(sub => (
+                                                <Link
+                                                    key={sub.name}
+                                                    to={sub.path}
+                                                    onClick={() => setIsMobileMenuOpen(false)}
+                                                    className="block text-sm font-semibold text-slate-500 hover:text-pink-600"
+                                                >
+                                                    {sub.name}
+                                                </Link>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
+                            ))}
+                        </div>
 
-                                {link.subLinks && activeDropdown === link.name && (
-                                    <div className="pl-4 space-y-4 animate-in fade-in slide-in-from-top-2">
-                                        {link.subLinks.map(sub => (
-                                            <Link
-                                                key={sub.name}
-                                                to={sub.path}
-                                                onClick={() => setIsMobileMenuOpen(false)}
-                                                className="block text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-pink-600"
-                                            >
-                                                {sub.name}
-                                            </Link>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-auto pt-10">
-                        {!user && (
-                            <button
-                                onClick={() => { setIsMobileMenuOpen(false); onOpenAuth(); }}
-                                className="w-full bg-slate-900 text-white py-3 sm:py-4 rounded-xl font-black uppercase tracking-widest"
-                            >
-                                Se connecter
-                            </button>
-                        )}
+                        <div className="mt-8 border-t border-slate-200 pt-6 space-y-4">
+                            <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)} className="text-sm font-semibold text-slate-700">
+                                Nous contacter
+                            </Link>
+                            <div className="text-xs uppercase tracking-widest text-slate-400">France | FR €</div>
+                        </div>
                     </div>
                 </div>
             )}

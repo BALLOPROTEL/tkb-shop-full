@@ -78,6 +78,34 @@ h3,
   animation: marquee 20s linear infinite;
 }
 
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(14px);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 12s ease-in-out infinite;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.9s ease-out both;
+}
+
 /* Barre de défilement élégante (Fine et Noire) */
 ::-webkit-scrollbar {
   width: 5px;
