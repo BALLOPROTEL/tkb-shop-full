@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     User,
@@ -84,7 +84,7 @@ const Navbar = () => {
 
     // 2. STRUCTURE COMPLETE DES CATEGORIES (Aucune coupe)
     const navLinks = [
-        { name: 'Nouveautes', path: '/' },
+        { name: 'Nouveautés', path: '/' },
         { name: 'Sacs', path: '/shop/sacs' },
         {
             name: 'Chaussures',
@@ -92,7 +92,7 @@ const Navbar = () => {
             subLinks: [
                 { name: 'Femme', path: '/shop/chaussures/femme' },
                 { name: 'Homme', path: '/shop/chaussures/homme' },
-                { name: 'Bebe', path: '/shop/chaussures/bebe' }
+                { name: 'Bébé', path: '/shop/chaussures/bebe' }
             ]
         },
         {
@@ -105,7 +105,7 @@ const Navbar = () => {
             ]
         },
         {
-            name: 'Vetements',
+            name: 'Vêtements',
             path: '/shop/vetements',
             subLinks: [
                 { name: 'Robes', path: '/shop/vetements/robes' },
@@ -179,21 +179,53 @@ const Navbar = () => {
                             )}
 
                             {isProfileOpen && (
-                                <div className="absolute right-0 mt-6 w-48 sm:w-52 bg-white border border-slate-100 shadow-2xl py-3 rounded-xl animate-in fade-in zoom-in duration-200">
-                                    <div className="px-6 py-3 border-b border-slate-50 mb-2">
-                                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Compte</p>
-                                        <p className="text-xs font-bold text-slate-900 truncate">{user?.name}</p>
+                                <div className="absolute right-0 mt-5 w-64 bg-white/95 backdrop-blur-md border border-[#d4af37]/40 shadow-2xl rounded-3xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                                    <div className="relative px-6 py-5 bg-gradient-to-br from-white via-[#fff7e6] to-[#fdf1d4] border-b border-[#d4af37]/30">
+                                        <div className="absolute -top-10 -right-8 w-24 h-24 bg-[#d4af37]/30 blur-2xl rounded-full" />
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#f7e7c3] to-[#d4af37] text-slate-900 flex items-center justify-center text-lg font-black shadow-lg border border-[#d4af37]/60">
+                                                {(user?.name || 'U').charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] text-slate-500 uppercase font-black tracking-[0.35em]">Compte</p>
+                                                <p className="text-sm font-bold text-slate-900 truncate mt-1">{user?.name}</p>
+                                                <p className="text-[11px] text-slate-500 truncate">{user?.email}</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    {user?.role === 'admin' && (
-                                        <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-3 px-6 py-3 text-[10px] uppercase font-black text-blue-600 hover:bg-blue-50">
-                                            <Shield size={14} /> Console admin
+                                    <div className="p-2">
+                                        {user?.role === 'admin' && (
+                                            <Link
+                                                to="/admin"
+                                                onClick={() => setIsProfileOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[10px] uppercase font-black tracking-[0.2em] text-blue-600 hover:bg-blue-50"
+                                            >
+                                                <Shield size={14} /> Console admin
+                                            </Link>
+                                        )}
+                                        <Link
+                                            to="/profile"
+                                            onClick={() => setIsProfileOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[10px] uppercase font-black tracking-[0.2em] text-slate-700 hover:bg-slate-50"
+                                        >
+                                            <User size={14} /> Mon profil
                                         </Link>
-                                    )}
-                                    <Link to="/profile" onClick={() => setIsProfileOpen(false)} className="block px-6 py-3 text-[10px] uppercase font-bold text-slate-700 hover:bg-slate-50 tracking-widest">Mon Profil</Link>
-                                    <Link to="/my-orders" onClick={() => setIsProfileOpen(false)} className="block px-6 py-3 text-[10px] uppercase font-bold text-slate-700 hover:bg-slate-50 tracking-widest">Mes Achats</Link>
-                                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-6 py-3 text-[10px] uppercase font-black text-red-500 hover:bg-red-50 border-t border-slate-50 mt-2">
-                                        <LogOut size={14} /> Deconnexion
-                                    </button>
+                                        <Link
+                                            to="/my-orders"
+                                            onClick={() => setIsProfileOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[10px] uppercase font-black tracking-[0.2em] text-slate-700 hover:bg-slate-50"
+                                        >
+                                            <ShoppingBag size={14} /> Mes achats
+                                        </Link>
+                                    </div>
+                                    <div className="border-t border-slate-100 px-2 py-2">
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[10px] uppercase font-black tracking-[0.2em] text-red-600 hover:bg-red-50"
+                                        >
+                                            <LogOut size={14} /> Déconnexion
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -335,3 +367,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+

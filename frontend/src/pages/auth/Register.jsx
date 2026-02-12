@@ -37,10 +37,20 @@ const Register = () => {
         }
 
         try {
+            const selectedCountry = countries.find((c) => c.code === formData.country);
             await api.post('/api/auth/register', {
+                firstName: formData.firstName,
+                lastName: formData.lastName,
                 name: `${formData.firstName} ${formData.lastName}`.trim(),
                 email: formData.email,
                 password: formData.password,
+                phone: formData.phone,
+                country: formData.country,
+                countryDial: selectedCountry?.dial,
+                acceptTerms: formData.acceptTerms,
+                acceptSalesPolicy: formData.acceptSalesPolicy,
+                acceptMarketing: formData.acceptMarketing,
+                acceptOrderTracking: formData.acceptOrderTracking,
             });
             toast.success("Compte cree ! Connectez-vous.");
             navigate('/login');

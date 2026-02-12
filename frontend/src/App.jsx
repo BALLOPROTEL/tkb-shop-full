@@ -20,12 +20,14 @@ import Favorites from './pages/Favorites';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Contact from './pages/legal/Contact';
+import LegalPage from './pages/legal/LegalPage';
 
 import AdminLayout from './components/admin/AdminLayout';
 import DashboardHome from './pages/admin/DashboardHome';
 import AdminProducts from './pages/admin/AdminProducts';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminNewsletter from './pages/admin/AdminNewsletter';
 
 const ProtectedRoute = ({ children, isAdmin = false }) => {
   const user = JSON.parse(localStorage.getItem('user'));
@@ -57,11 +59,16 @@ const AppContent = () => {
           <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/mentions-legales" element={<LegalPage />} />
+          <Route path="/cgv" element={<LegalPage />} />
+          <Route path="/confidentialite" element={<LegalPage />} />
+          <Route path="/livraison-retours" element={<LegalPage />} />
 
           <Route path="/admin" element={<ProtectedRoute isAdmin={true}><AdminLayout><DashboardHome /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/products" element={<ProtectedRoute isAdmin={true}><AdminLayout><AdminProducts /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/orders" element={<ProtectedRoute isAdmin={true}><AdminLayout><AdminOrders /></AdminLayout></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute isAdmin={true}><AdminLayout><AdminUsers /></AdminLayout></ProtectedRoute>} />
+          <Route path="/admin/newsletter" element={<ProtectedRoute isAdmin={true}><AdminLayout><AdminNewsletter /></AdminLayout></ProtectedRoute>} />
         </Routes>
       </main>
       {!isAdminPath && <Footer />}

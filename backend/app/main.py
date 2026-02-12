@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Request
+﻿from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field, EmailStr
@@ -40,7 +40,7 @@ try:
 except ValueError:
     STRIPE_AMOUNT_MULTIPLIER = 100
 
-# Configuration Stripe avec vérification
+# Configuration Stripe avec vÃ©rification
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 # PayPal
@@ -56,7 +56,7 @@ except ValueError:
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-app = FastAPI(title="TKB Shop API - Version Expert Corrigée")
+app = FastAPI(title="TKB Shop API - Version Expert CorrigÃ©e")
 
 # --- 2. CONFIGURATION CORS ---
 app.add_middleware(
@@ -73,12 +73,29 @@ db_name = os.getenv("MONGO_DB_NAME", "protel_shop")
 client = MongoClient(mongo_uri)
 db = client.get_database(db_name) # Utilisation du nom de base final
 
-# --- 4. MODÈLES DE DONNÉES (Pydantic) ---
+# --- 4. MODÃˆLES DE DONNÃ‰ES (Pydantic) ---
 
 class UserRegister(BaseModel):
-    name: str
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    name: Optional[str] = None
     email: EmailStr
     password: str
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    countryDial: Optional[str] = None
+    acceptTerms: Optional[bool] = None
+    acceptSalesPolicy: Optional[bool] = None
+    acceptMarketing: Optional[bool] = None
+    acceptOrderTracking: Optional[bool] = None
+
+class UserUpdate(BaseModel):
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    countryDial: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -125,6 +142,9 @@ class Order(BaseModel):
 
 class SiteSettings(BaseModel):
     bannerText: str
+
+class NewsletterSignup(BaseModel):
+    email: EmailStr
 
 # --- 4b. OUTILS ORDERS / PRICING ---
 def _coerce_items(items: list):
@@ -243,7 +263,7 @@ def _paypal_verify_order(order_id: str, expected_total: float):
         raise HTTPException(400, "Montant PayPal invalide")
     return order
 
-# --- 5. DÉPENDANCES DE SÉCURITÉ ---
+# --- 5. DÃ‰PENDANCES DE SÃ‰CURITÃ‰ ---
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -252,7 +272,7 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    # Rigueur : Nettoyage du préfixe Bearer si envoyé manuellement
+    # Rigueur : Nettoyage du prÃ©fixe Bearer si envoyÃ© manuellement
     token = token.replace("Bearer ", "")
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -277,23 +297,61 @@ async def get_current_admin(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Accès administrateur requis"
+            detail="AccÃ¨s administrateur requis"
         )
     return current_user
+
+def _sanitize_user(u: dict):
+    return {
+        "id": str(u.get("_id")),
+        "name": u.get("name"),
+        "firstName": u.get("firstName"),
+        "lastName": u.get("lastName"),
+        "email": u.get("email"),
+        "role": u.get("role", "client"),
+        "phone": u.get("phone"),
+        "country": u.get("country"),
+        "countryDial": u.get("countryDial"),
+        "consents": u.get("consents"),
+    }
 
 # --- 6. ROUTES AUTHENTIFICATION ---
 
 @app.post("/api/auth/register")
 def register(user: UserRegister):
-    if db.users.find_one({"email": user.email}): 
-        raise HTTPException(400, "Email déjà enregistré")
-    db.users.insert_one({
-        "name": user.name, 
-        "email": user.email, 
-        "password": pwd_context.hash(user.password), 
-        "role": "client", 
+    if db.users.find_one({"email": user.email}):
+        raise HTTPException(400, "Email deja enregistre")
+    full_name = (user.name or "").strip()
+    if not full_name:
+        full_name = f"{(user.firstName or '').strip()} {(user.lastName or '').strip()}".strip()
+    if not full_name:
+        raise HTTPException(400, "Nom invalide")
+
+    user_doc = {
+        "name": full_name,
+        "firstName": user.firstName,
+        "lastName": user.lastName,
+        "email": user.email,
+        "password": pwd_context.hash(user.password),
+        "role": "client",
         "createdAt": datetime.now()
-    })
+    }
+    if user.phone:
+        user_doc["phone"] = user.phone
+    if user.country:
+        user_doc["country"] = user.country
+    if user.countryDial:
+        user_doc["countryDial"] = user.countryDial
+
+    user_doc["consents"] = {
+        "terms": bool(user.acceptTerms),
+        "salesPolicy": bool(user.acceptSalesPolicy),
+        "marketing": bool(user.acceptMarketing),
+        "orderTracking": bool(user.acceptOrderTracking),
+    }
+    user_doc["consentsUpdatedAt"] = datetime.now()
+
+    db.users.insert_one(user_doc)
     return {"success": True}
 
 @app.post("/api/auth/login", response_model=Token)
@@ -306,8 +364,41 @@ def login(user: UserLogin):
     return {
         "access_token": access_token, 
         "token_type": "bearer", 
-        "user": {"id": str(u["_id"]), "name": u["name"], "email": u["email"], "role": u.get("role", "client")}
+        "user": _sanitize_user(u)
     }
+
+@app.get("/api/users/me")
+def get_me(current_user: dict = Depends(get_current_user)):
+    return _sanitize_user(current_user)
+
+@app.put("/api/users/me")
+def update_me(data: UserUpdate, current_user: dict = Depends(get_current_user)):
+    update = {}
+    if data.firstName is not None:
+        update["firstName"] = data.firstName
+    if data.lastName is not None:
+        update["lastName"] = data.lastName
+    if data.name is not None:
+        update["name"] = data.name
+    if data.phone is not None:
+        update["phone"] = data.phone
+    if data.country is not None:
+        update["country"] = data.country
+    if data.countryDial is not None:
+        update["countryDial"] = data.countryDial
+
+    if ("name" not in update) and (data.firstName is not None or data.lastName is not None):
+        first = data.firstName if data.firstName is not None else current_user.get("firstName") or ""
+        last = data.lastName if data.lastName is not None else current_user.get("lastName") or ""
+        full_name = f"{first} {last}".strip()
+        if full_name:
+            update["name"] = full_name
+
+    if update:
+        db.users.update_one({"_id": current_user["_id"]}, {"$set": update})
+        current_user = db.users.find_one({"_id": current_user["_id"]})
+
+    return _sanitize_user(current_user)
 
 # --- 7. ROUTES PRODUITS ---
 
@@ -413,7 +504,7 @@ def create_order(o: Order, user: dict = Depends(get_current_user)):
         if not payment_id:
             raise HTTPException(400, "paymentId manquant")
         _paypal_verify_order(payment_id, total)
-        d["status"] = "Payé"
+        d["status"] = "PayÃ©"
         _decrement_stock(normalized_items, strict=True)
     else:
         d["status"] = "En attente"
@@ -443,9 +534,9 @@ def update_order_status(id: str, data: dict, admin: dict = Depends(get_current_a
 
 @app.post("/api/payments/create-stripe-session")
 async def create_stripe_session(data: dict, user: dict = Depends(get_current_user)):
-    # Vérification de la clé API avant de continuer
+    # VÃ©rification de la clÃ© API avant de continuer
     if not stripe.api_key:
-        raise HTTPException(status_code=500, detail="Clé API Stripe non configurée au serveur")
+        raise HTTPException(status_code=500, detail="ClÃ© API Stripe non configurÃ©e au serveur")
     
     try:
         order_id = data.get("orderId")
@@ -513,11 +604,11 @@ async def stripe_webhook(request: Request):
         order_id = session.get("metadata", {}).get("orderId")
         if order_id and ObjectId.is_valid(order_id):
             order = db.orders.find_one({"_id": ObjectId(order_id)})
-            if order and order.get("status") != "Payé":
+            if order and order.get("status") != "PayÃ©":
                 payment_id = session.get("payment_intent") or session.get("id")
                 db.orders.update_one(
                     {"_id": ObjectId(order_id)},
-                    {"$set": {"status": "Payé", "paymentId": payment_id}}
+                    {"$set": {"status": "PayÃ©", "paymentId": payment_id}}
                 )
                 try:
                     _decrement_stock(order.get("items", []), strict=False)
@@ -527,7 +618,7 @@ async def stripe_webhook(request: Request):
     return {"received": True}
 
 
-# --- 9. PARAMÈTRES & STATS ADMIN ---
+# --- 9. PARAMÃˆTRES & STATS ADMIN ---
 
 @app.get("/api/settings")
 def get_settings(): 
@@ -539,10 +630,30 @@ def update_settings(s: SiteSettings, admin: dict = Depends(get_current_admin)):
     db.settings.update_one({"_id": "global_settings"}, {"$set": {"bannerText": s.bannerText}}, upsert=True)
     return {"success": True}
 
+@app.post("/api/newsletter")
+def subscribe_newsletter(data: NewsletterSignup):
+    email = data.email.lower().strip()
+    if db.newsletter.find_one({"email": email}):
+        return {"success": True, "already": True}
+    db.newsletter.insert_one({
+        "email": email,
+        "createdAt": datetime.now()
+    })
+    return {"success": True}
+
+@app.get("/api/admin/newsletter")
+def list_newsletter(admin: dict = Depends(get_current_admin)):
+    items = []
+    for n in db.newsletter.find().sort("createdAt", -1):
+        n["id"] = str(n["_id"])
+        del n["_id"]
+        items.append(n)
+    return items
+
 @app.get("/api/admin/stats")
 def get_stats(admin: dict = Depends(get_current_admin)):
     total_revenue = db.orders.aggregate([
-        {"$match": {"status": {"$in": ["Payé", "Livré", "Payé (Vérifié)"]}}},
+        {"$match": {"status": {"$in": ["PayÃ©", "LivrÃ©", "PayÃ© (VÃ©rifiÃ©)"]}}},
         {"$group": {"_id": None, "total": {"$sum": "$totalAmount"}}}
     ])
     rev_list = list(total_revenue)
@@ -569,3 +680,4 @@ def delete_user(id: str, admin: dict = Depends(get_current_admin)):
         raise HTTPException(400, "Format d'ID invalide")
     db.users.delete_one({"_id": ObjectId(id)})
     return {"success": True}
+

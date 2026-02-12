@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, LogOut, Shield, CheckCircle, Heart, ArrowUpDown } from 'lucide-react';
+import { LogOut, Shield, Heart, ArrowUpDown, Pencil, Save, Phone, Globe } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useFavorites } from '../context/FavoritesContext';
 import { getDisplayCategory, getGroupLabel, isNewProduct, isPromo } from '../utils/product';
+import api from '../api';
+import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
 
 const UserProfile = () => {
     const navigate = useNavigate();
@@ -21,8 +23,10 @@ const UserProfile = () => {
     const [formData, setFormData] = useState(() => {
         const stored = getStoredUser();
         return {
-            name: stored?.name || '',
-            phone: stored?.phone || ''
+            firstName: stored?.firstName || '',
+            lastName: stored?.lastName || '',
+            phone: stored?.phone || '',
+            country: stored?.country || 'CI',
         };
     });
 
@@ -31,6 +35,53 @@ const UserProfile = () => {
             navigate('/');
         }
     }, [navigate, user]);
+
+    useEffect(() => {
+        const fetchMe = async () => {
+            try {
+                const res = await api.get('/api/users/me');
+                const fresh = res.data;
+                const merged = { ...user, ...fresh };
+                localStorage.setItem('user', JSON.stringify(merged));
+                setUser(merged);
+                setFormData({
+                    firstName: merged.firstName || '',
+                    lastName: merged.lastName || '',
+                    phone: merged.phone || '',
+                    country: merged.country || 'CI',
+                });
+            } catch (e) {
+                // ignore
+            }
+        };
+        if (user) fetchMe();
+    }, []);
+
+    const countries = React.useMemo(() => {
+        try {
+            const displayNames = typeof Intl !== 'undefined' && Intl.DisplayNames
+                ? new Intl.DisplayNames(['fr'], { type: 'region' })
+                : null;
+            const codes = getCountries();
+            const toFlag = (code) => code
+                .toUpperCase()
+                .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
+
+            return codes
+                .map((code) => {
+                    const name = displayNames?.of(code) || code;
+                    const dial = `+${getCountryCallingCode(code)}`;
+                    return { code, name, dial, flag: toFlag(code) };
+                })
+                .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+        } catch (e) {
+            return [
+                { code: 'CI', name: "Côte d'Ivoire", dial: '+225', flag: '🇨🇮' },
+                { code: 'FR', name: 'France', dial: '+33', flag: '🇫🇷' },
+                { code: 'US', name: 'United States', dial: '+1', flag: '🇺🇸' },
+            ];
+        }
+    }, []);
 
     const sortedFavorites = React.useMemo(() => {
         const list = [...favorites];
@@ -52,22 +103,30 @@ const UserProfile = () => {
 
     const handleSaveProfile = async () => {
         try {
-            // Mise à jour de l'état local et du storage
-            const updatedUser = { ...user, name: formData.name, phone: formData.phone };
+            const selectedCountry = countries.find((c) => c.code === formData.country);
+            const payload = {
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                phone: formData.phone,
+                country: formData.country,
+                countryDial: selectedCountry?.dial,
+            };
+            const res = await api.put('/api/users/me', payload);
+            const updatedUser = { ...user, ...res.data };
             localStorage.setItem('user', JSON.stringify(updatedUser));
             setUser(updatedUser);
             setIsEditing(false);
-            toast.success("Profil mis à jour avec succès !");
+            toast.success('Profil mis à jour avec succès !');
         } catch (error) {
             console.error(error);
-            toast.error("Erreur lors de la mise à jour");
+            toast.error('Erreur lors de la mise à jour');
         }
     };
 
     const handleLogout = () => {
         localStorage.removeItem('user');
         localStorage.removeItem('access_token');
-        toast.success("Session clôturée");
+        toast.success('Session clôturée');
         navigate('/');
         window.location.reload();
     };
@@ -76,30 +135,33 @@ const UserProfile = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 pt-32 pb-20 px-4 sm:px-6">
-            <div className="max-w-4xl mx-auto bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 md:p-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="max-w-5xl mx-auto bg-white rounded-[2.5rem] shadow-xl border border-slate-100 p-8 md:p-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
                 {/* En-tête Profil */}
-                <div className="flex flex-col md:flex-row items-center gap-8 mb-12 border-b border-slate-50 pb-10">
-                    <div className="w-28 h-28 rounded-full bg-slate-900 text-pink-400 flex items-center justify-center text-4xl font-black shadow-xl border-4 border-white">
-                        {user.name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="text-center md:text-left flex-grow">
-                        <div className="flex items-center justify-center md:justify-start gap-3 mb-1">
-                            <h1 className="text-3xl font-serif text-slate-900">{user.name}</h1>
-                            {user.role === 'admin' && <Shield size={18} className="text-blue-500" />}
+                <div className="relative overflow-hidden rounded-3xl border border-slate-100 bg-gradient-to-br from-white via-slate-50 to-[#fff7e6] p-8 mb-10">
+                    <div className="absolute -top-10 right-[-10%] w-48 h-48 bg-[#d4af37]/20 blur-3xl rounded-full" />
+                    <div className="flex flex-col md:flex-row items-center gap-8">
+                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#f7e7c3] to-[#d4af37] text-slate-900 flex items-center justify-center text-3xl font-black shadow-xl border border-[#d4af37]/60">
+                            {user.name?.charAt(0).toUpperCase()}
                         </div>
-                        <p className="text-slate-400 text-sm mb-4">{user.email}</p>
-                        <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-pink-50 text-pink-600 border border-pink-100'
-                            }`}>
-                            {user.role === 'admin' ? 'Administrateur Système' : 'Membre Privilégié'}
-                        </span>
+                        <div className="text-center md:text-left flex-grow">
+                            <div className="flex items-center justify-center md:justify-start gap-3 mb-1">
+                                <h1 className="text-3xl font-serif text-slate-900">{user.name}</h1>
+                                {user.role === 'admin' && <Shield size={18} className="text-blue-500" />}
+                            </div>
+                            <p className="text-slate-500 text-sm mb-4">{user.email}</p>
+                            <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-pink-50 text-pink-600 border border-pink-100'
+                                }`}>
+                                {user.role === 'admin' ? 'Administrateur' : 'Membre Privilégié'}
+                            </span>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 text-red-500 hover:bg-red-50 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-transparent hover:border-red-100"
+                        >
+                            <LogOut size={16} /> Déconnexion
+                        </button>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 text-red-500 hover:bg-red-50 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-transparent hover:border-red-100"
-                    >
-                        <LogOut size={16} /> Déconnexion
-                    </button>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -119,48 +181,108 @@ const UserProfile = () => {
 
                 {activeTab === 'profile' ? (
                     <>
-                        {/* Formulaire d'informations */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-10">
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Identité Complète</label>
-                                <input
-                                    disabled={!isEditing}
-                                    className="w-full p-5 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-pink-200 outline-none transition-all text-slate-900 font-medium disabled:opacity-60"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    placeholder="Ex: Sarah Koné"
-                                />
+                        <div className="mt-10 rounded-3xl border border-slate-100 bg-white/90 shadow-xl overflow-hidden">
+                            <div className="flex flex-wrap items-start justify-between gap-6 px-6 sm:px-8 py-6 bg-gradient-to-r from-white via-[#fff8ee] to-white border-b border-slate-100">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-400">Profil</p>
+                                    <h2 className="mt-2 text-lg sm:text-xl font-serif uppercase tracking-[0.2em] text-slate-900">
+                                        Modifier profil
+                                    </h2>
+                                    <p className="mt-2 text-xs text-slate-500 max-w-md">
+                                        Complétez vos informations pour un suivi plus rapide et une expérience personnalisée.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {isEditing && (
+                                        <button
+                                            onClick={() => {
+                                                setFormData({
+                                                    firstName: user.firstName || '',
+                                                    lastName: user.lastName || '',
+                                                    phone: user.phone || '',
+                                                    country: user.country || 'CI',
+                                                });
+                                                setIsEditing(false);
+                                            }}
+                                            className="px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-700 border border-slate-200 hover:border-slate-300 transition-all"
+                                        >
+                                            Annuler
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => isEditing ? handleSaveProfile() : setIsEditing(true)}
+                                        className="bg-slate-900 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-[0.2em] hover:bg-pink-600 transition-all shadow-lg shadow-slate-200 flex items-center gap-3"
+                                    >
+                                        {isEditing ? <Save size={16} /> : <Pencil size={16} />}
+                                        {isEditing ? 'Sauvegarder' : 'Modifier profil'}
+                                    </button>
+                                </div>
                             </div>
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Contact Téléphonique</label>
-                                <input
-                                    disabled={!isEditing}
-                                    type="tel"
-                                    className="w-full p-5 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-pink-200 outline-none transition-all text-slate-900 font-medium disabled:opacity-60"
-                                    value={formData.phone}
-                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    placeholder="Ex: +225 00 00 00 00 00"
-                                />
-                            </div>
-                        </div>
 
-                        {/* Actions */}
-                        <div className="mt-12 flex flex-col sm:flex-row justify-end gap-4">
-                            {isEditing && (
-                                <button
-                                    onClick={() => setIsEditing(false)}
-                                    className="px-8 py-4 rounded-2xl font-bold text-slate-400 hover:text-slate-600 transition-all text-sm"
-                                >
-                                    Annuler
-                                </button>
-                            )}
-                            <button
-                                onClick={() => isEditing ? handleSaveProfile() : setIsEditing(true)}
-                                className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-pink-600 transition-all shadow-lg shadow-slate-200 flex items-center gap-3"
-                            >
-                                {isEditing ? <CheckCircle size={16} /> : <User size={16} />}
-                                {isEditing ? "Sauvegarder" : "Modifier le profil"}
-                            </button>
+                            <div className="p-6 sm:p-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Prénom*</label>
+                                        <input
+                                            disabled={!isEditing}
+                                            className="mt-2 w-full p-4 rounded-2xl border border-slate-200 bg-white/80 focus:bg-white focus:ring-2 focus:ring-pink-200 outline-none transition-all text-slate-900 font-medium disabled:bg-slate-50/70 disabled:text-slate-400"
+                                            value={formData.firstName}
+                                            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                                            placeholder="Ex: Sarah"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Nom de famille*</label>
+                                        <input
+                                            disabled={!isEditing}
+                                            className="mt-2 w-full p-4 rounded-2xl border border-slate-200 bg-white/80 focus:bg-white focus:ring-2 focus:ring-pink-200 outline-none transition-all text-slate-900 font-medium disabled:bg-slate-50/70 disabled:text-slate-400"
+                                            value={formData.lastName}
+                                            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                                            placeholder="Ex: Koné"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Adresse e-mail</label>
+                                        <input
+                                            disabled
+                                            className="mt-2 w-full p-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 font-medium"
+                                            value={user.email}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Pays</label>
+                                        <div className="relative mt-2">
+                                            <Globe size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <select
+                                                disabled={!isEditing}
+                                                className="w-full pl-10 pr-4 py-4 rounded-2xl border border-slate-200 bg-white/80 focus:bg-white focus:ring-2 focus:ring-pink-200 outline-none transition-all text-slate-900 font-medium disabled:bg-slate-50/70 disabled:text-slate-400"
+                                                value={formData.country}
+                                                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                                            >
+                                                {countries.map((c) => (
+                                                    <option key={c.code} value={c.code}>
+                                                        {c.flag} {c.name} ({c.dial})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Téléphone</label>
+                                        <div className="relative mt-2">
+                                            <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                disabled={!isEditing}
+                                                type="tel"
+                                                className="w-full pl-10 pr-4 py-4 rounded-2xl border border-slate-200 bg-white/80 focus:bg-white focus:ring-2 focus:ring-pink-200 outline-none transition-all text-slate-900 font-medium disabled:bg-slate-50/70 disabled:text-slate-400"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                placeholder="00 00 00 00 00"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </>
                 ) : (
@@ -264,5 +386,6 @@ const UserProfile = () => {
 };
 
 export default UserProfile;
+
 
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Menu, ArrowLeft, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Menu, ArrowLeft, X, Mail } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AdminLayout({ children }) {
@@ -30,6 +30,7 @@ export default function AdminLayout({ children }) {
         { path: '/admin/products', icon: Package, label: 'Gestion Stocks' },
         { path: '/admin/orders', icon: ShoppingBag, label: 'Commandes' },
         { path: '/admin/users', icon: Users, label: 'Clients' },
+        { path: '/admin/newsletter', icon: Mail, label: 'Newsletter' },
     ];
 
     return (
