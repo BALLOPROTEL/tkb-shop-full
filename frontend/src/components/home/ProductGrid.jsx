@@ -36,7 +36,7 @@ export default function ProductGrid() {
         <section className="py-20 bg-white">
             <div className="container mx-auto px-4 sm:px-6">
                 <div className="flex flex-wrap justify-center gap-4 mb-16">
-                    {['Tout', 'Sacs', 'Chaussures', 'Vêtements', 'Accessoires'].map(cat => (
+                    {['Tout', 'Sacs', 'Chaussures', 'Vetements', 'Accessoires'].map(cat => (
                         <button key={cat} onClick={() => { setActiveCategory(cat); setActiveSubcategory('Tout'); setCurrentPage(1); }}
                             className={`px-5 sm:px-8 py-2 rounded-full text-[10px] sm:text-xs font-bold tracking-widest uppercase transition-all ${activeCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
                             {cat}

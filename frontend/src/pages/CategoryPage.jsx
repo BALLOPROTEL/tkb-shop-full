@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api';
 import { slugify, normalizeCategorySlug, getGroupLabel, getGroupLabelFromSlug, getSubcategoryLabelFromSlug, getDisplayCategory, isNewProduct, isPromo } from '../utils/product';
 import { Loader2, Sparkles, Heart, ArrowUpDown } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay, EffectFade } from 'swiper/modules';
+import { Navigation } from 'swiper/modules';
 import 'swiper/css';
-import 'swiper/css/effect-fade';
+import 'swiper/css/navigation';
 import { useFavorites } from '../context/FavoritesContext';
 import { toast } from 'react-hot-toast';
 
@@ -31,7 +31,7 @@ const CategoryPage = () => {
                 // Rigueur Axios : on utilise api.get
                 const res = await api.get('/api/products');
 
-                // Les données sont directement dans res.data avec Axios
+                // Les donnees sont directement dans res.data avec Axios
                 const allProducts = res.data;
 
                 // Logique de filtrage
@@ -53,7 +53,7 @@ const CategoryPage = () => {
                 setProducts(filtered.reverse());
             } catch (err) {
                 console.error("Erreur filtrage", err);
-                toast.error("Erreur lors du chargement de la catégorie");
+                toast.error("Erreur lors du chargement de la categorie");
             } finally {
                 setLoading(false);
             }
@@ -113,22 +113,65 @@ const CategoryPage = () => {
     };
 
     return (
-        <div className="bg-white min-h-screen pt-28 sm:pt-36 lg:pt-40 pb-20">
+                <div className="bg-white min-h-screen pt-28 sm:pt-36 lg:pt-40 pb-20">
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `
+                    .product-card-swiper .swiper-button-next,
+                    .product-card-swiper .swiper-button-prev {
+                        width: 26px;
+                        height: 26px;
+                        border-radius: 999px;
+                        background: rgba(255,255,255,0.9);
+                        box-shadow: 0 4px 12px rgba(15,23,42,0.15);
+                        color: #0f172a;
+                        z-index: 30;
+                        pointer-events: auto;
+                        transition: opacity .2s ease, transform .2s ease;
+                    }
+                    @media (hover: hover) and (pointer: fine) {
+                        .product-card-swiper .swiper-button-next,
+                        .product-card-swiper .swiper-button-prev {
+                            opacity: 0;
+                            transform: scale(0.96);
+                        }
+                        .product-card-shell:hover .swiper-button-next,
+                        .product-card-shell:hover .swiper-button-prev,
+                        .product-card-swiper:hover .swiper-button-next,
+                        .product-card-swiper:hover .swiper-button-prev {
+                            opacity: 1;
+                            transform: scale(1);
+                        }
+                    }
+                    @media (hover: none) and (pointer: coarse) {
+                        .product-card-swiper .swiper-button-next,
+                        .product-card-swiper .swiper-button-prev {
+                            opacity: 1;
+                        }
+                    }
+                    .product-card-swiper .swiper-button-next::after,
+                    .product-card-swiper .swiper-button-prev::after {
+                        font-size: 10px;
+                        font-weight: 700;
+                    }
+                    `,
+                }}
+            />
             <div className="container mx-auto px-4 sm:px-6 lg:px-12">
 
-                {/* En-tête de catégorie luxe */}
+                {/* En-tete de categorie luxe */}
                 <div className="text-center mb-20 space-y-4">
                     <div className="flex items-center justify-center gap-2 text-pink-400">
                         <Sparkles size={16} />
                         <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.4em]">
-                            {categoryLabel} {subcategoryLabel && `• ${subcategoryLabel}`}
+                            {categoryLabel} {subcategoryLabel && `- ${subcategoryLabel}`}
                         </span>
                     </div>
                     <h1 className="text-3xl sm:text-4xl md:text-6xl font-serif text-slate-900 capitalize">
                         {subcategoryLabel || categoryLabel}
                     </h1>
                     <p className="text-slate-400 text-sm font-light italic">
-                        Une sélection exclusive signée TKB_SHOP
+                        Une selection exclusive signee TKB_SHOP
                     </p>
                 </div>
 
@@ -141,7 +184,7 @@ const CategoryPage = () => {
                                 onChange={(e) => setActiveSubcategory(e.target.value)}
                                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600 w-full sm:w-auto"
                             >
-                                <option value="Tout">Toutes sous-catégories</option>
+                                <option value="Tout">Toutes sous-categories</option>
                                 {availableSubcategories.map((sub) => (
                                     <option key={sub} value={sub}>{sub}</option>
                                 ))}
@@ -171,9 +214,9 @@ const CategoryPage = () => {
                                     onChange={(e) => setSortBy(e.target.value)}
                                     className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600 w-full sm:w-auto"
                                 >
-                                    <option value="recent">Récents</option>
+                                    <option value="recent">Recents</option>
                                     <option value="price-asc">Prix croissant</option>
-                                    <option value="price-desc">Prix décroissant</option>
+                                    <option value="price-desc">Prix decroissant</option>
                                     <option value="name-asc">Nom A-Z</option>
                                 </select>
                             </div>
@@ -183,7 +226,7 @@ const CategoryPage = () => {
                                 onClick={resetFilters}
                                 className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-700 hover:border-slate-300"
                             >
-                                Réinitialiser
+                                Reinitialiser
                             </button>
                         </div>
                     </div>
@@ -193,8 +236,8 @@ const CategoryPage = () => {
                     <div className="flex justify-center py-20"><Loader2 className="animate-spin text-pink-600" /></div>
                 ) : sortedProducts.length === 0 ? (
                     <div className="text-center py-20">
-                        <p className="font-serif italic text-slate-400 text-xl">Aucune pièce disponible dans cette sélection pour le moment.</p>
-                        <Link to="/" className="mt-8 inline-block border-b border-slate-900 pb-1 text-xs font-bold uppercase tracking-widest">Retour aux nouveautés</Link>
+                        <p className="font-serif italic text-slate-400 text-xl">Aucune piece disponible dans cette selection pour le moment.</p>
+                        <Link to="/" className="mt-8 inline-block border-b border-slate-900 pb-1 text-xs font-bold uppercase tracking-widest">Retour aux nouveautes</Link>
                     </div>
                 ) : (
                     <>
@@ -204,55 +247,62 @@ const CategoryPage = () => {
                                 const promo = isPromo(product);
                                 const isNew = isNewProduct(product);
                                 return (
-                                    <div key={product.id} className="group">
-                                        <Link to={`/product/${product.id}`}>
-                                            <div className="relative aspect-[3/4] overflow-hidden bg-[#fff0f5] rounded-sm mb-6 shadow-sm group-hover:shadow-xl transition-shadow duration-500">
-                                                <div className="absolute top-3 left-3 z-20 flex flex-col gap-1">
-                                                    {isNew && <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Nouveau</span>}
-                                                    {promo && <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Promo</span>}
-                                                    <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-900">
-                                                        {getGroupLabel(product)}
+                                    <div key={product.id} className="group product-card-shell">
+                                        <div className="relative aspect-[3/4] overflow-hidden bg-[#fff0f5] rounded-sm mb-6 shadow-sm group-hover:shadow-xl transition-shadow duration-500">
+                                            <div className="absolute top-3 left-3 z-20 flex flex-col gap-1">
+                                                {isNew && <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Nouveau</span>}
+                                                {promo && <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Promo</span>}
+                                                <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-900">
+                                                    {getGroupLabel(product)}
+                                                </span>
+                                                {product.subcategory && (
+                                                    <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-pink-600">
+                                                        {product.subcategory}
                                                     </span>
-                                                    {product.subcategory && (
-                                                        <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-pink-600">
-                                                            {product.subcategory}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <button
-                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(product); }}
-                                                    className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur w-9 h-9 rounded-full flex items-center justify-center shadow"
-                                                    aria-label="Ajouter aux favoris"
-                                                >
-                                                    <Heart className={isFavorite(product.id) ? 'text-pink-600 fill-pink-600' : 'text-slate-700'} size={16} />
-                                                </button>
-                                                <Swiper
-                                                    modules={[Autoplay, EffectFade]}
-                                                    effect="fade"
-                                                    autoplay={{ delay: 3000 }}
-                                                    className="w-full h-full"
-                                                >
-                                                    {displayImages.map((img, idx) => (
-                                                        <SwiperSlide key={idx}>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(product); }}
+                                                className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur w-9 h-9 rounded-full flex items-center justify-center shadow"
+                                                aria-label="Ajouter aux favoris"
+                                            >
+                                                <Heart className={isFavorite(product.id) ? 'text-pink-600 fill-pink-600' : 'text-slate-700'} size={16} />
+                                            </button>
+                                            <Swiper
+                                                modules={[Navigation]}
+                                                navigation={displayImages.length > 1}
+                                                slidesPerView={1}
+                                                loop={displayImages.length > 1}
+                                                allowTouchMove={displayImages.length > 1}
+                                                className="w-full h-full product-card-swiper"
+                                            >
+                                                {displayImages.map((img, idx) => (
+                                                    <SwiperSlide key={idx}>
+                                                        <Link to={`/product/${product.id}`} className="block w-full h-full">
                                                             <img
                                                                 src={img}
                                                                 alt={product.name}
                                                                 className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-110"
                                                             />
-                                                        </SwiperSlide>
-                                                    ))}
-                                                </Swiper>
-                                                <div className="absolute inset-0 bg-pink-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
-                                                <div className="absolute bottom-0 left-0 w-full p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-500 z-20">
-                                                    <div className="bg-white/90 backdrop-blur-md py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-900 shadow-lg">
-                                                        Découvrir la pièce
-                                                    </div>
+                                                        </Link>
+                                                    </SwiperSlide>
+                                                ))}
+                                            </Swiper>
+                                            <div className="absolute inset-0 bg-pink-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10 pointer-events-none"></div>
+                                            <Link
+                                                to={`/product/${product.id}`}
+                                                className="absolute bottom-0 left-0 w-full p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-500 z-20"
+                                            >
+                                                <div className="bg-white/90 backdrop-blur-md py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-900 shadow-lg">
+                                                    Decouvrir la piece
                                                 </div>
-                                            </div>
-                                        </Link>
+                                            </Link>
+                                        </div>
                                         <div className="space-y-2 text-center">
                                             <p className="text-[9px] text-pink-400 font-bold uppercase tracking-[0.2em]">{getDisplayCategory(product)}</p>
-                                            <h3 className="font-serif text-xl text-slate-900 group-hover:text-pink-600 transition-colors">{product.name}</h3>
+                                            <Link to={`/product/${product.id}`} className="inline-block">
+                                                <h3 className="font-serif text-xl text-slate-900 group-hover:text-pink-600 transition-colors">{product.name}</h3>
+                                            </Link>
                                             <div className="flex items-center justify-center gap-2">
                                                 <p className="text-sm font-medium text-slate-900">{product.price.toLocaleString()} FCFA</p>
                                                 {promo && <p className="text-xs text-slate-300 line-through">{product.oldPrice.toLocaleString()} FCFA</p>}
@@ -265,7 +315,7 @@ const CategoryPage = () => {
 
                         {totalPages > 1 && (
                             <div className="mt-16 flex justify-center items-center gap-4">
-                                <button disabled={currentPage === 1} onClick={() => setCurrentPage(c => c - 1)} className="p-3 border rounded-full disabled:opacity-20">Précédent</button>
+                                <button disabled={currentPage === 1} onClick={() => setCurrentPage(c => c - 1)} className="p-3 border rounded-full disabled:opacity-20">Precedent</button>
                                 <span className="text-sm font-bold italic text-slate-400">Page {currentPage} / {totalPages}</span>
                                 <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(c => c + 1)} className="p-3 border rounded-full disabled:opacity-20">Suivant</button>
                             </div>
@@ -278,6 +328,8 @@ const CategoryPage = () => {
 };
 
 export default CategoryPage;
+
+
 
 
 

@@ -47,7 +47,7 @@ const ProductDetails = () => {
     const displayImages = product.images?.length > 0 ? product.images : [product.image];
     const groupLabel = getGroupLabel(product);
     const isShoes = groupLabel === 'Chaussures';
-    const isClothing = groupLabel === 'Vêtements';
+    const isClothing = groupLabel === 'Vetements';
     const sizes = (product.sizes && product.sizes.length > 0)
         ? product.sizes
         : (isShoes ? [36, 37, 38, 39, 40, 41] : (isClothing ? ['XS', 'S', 'M', 'L', 'XL'] : []));

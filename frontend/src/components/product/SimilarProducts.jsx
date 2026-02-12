@@ -31,7 +31,7 @@ const SimilarProducts = ({ currentProductId, currentGroup }) => {
             <div className="text-center mb-12 space-y-2">
                 <div className="flex items-center justify-center gap-2 text-pink-400">
                     <Sparkles size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Complétez votre look</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Completez votre look</span>
                 </div>
                 <h2 className="text-2xl font-serif text-slate-900">Vous aimerez aussi</h2>
             </div>

@@ -1,6 +1,6 @@
 export const CATEGORY_GROUPS = [
     { label: 'Sacs', value: 'Sacs', subcategories: [] },
-    { label: 'Chaussures', value: 'Chaussures', subcategories: ['Femme', 'Homme', 'B?b?'] },
+    { label: 'Chaussures', value: 'Chaussures', subcategories: ['Femme', 'Homme', 'Bebe'] },
     { label: 'Accessoires', value: 'Accessoires', subcategories: ['Colliers', 'Bagues', 'Bracelets'] },
     { label: 'Vetements', value: 'Vetements', subcategories: ['Robes', 'Abayas', 'Voiles & Hijabs'] },
 ];

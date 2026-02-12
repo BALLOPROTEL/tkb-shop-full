@@ -6,9 +6,9 @@ import { normalize, isNewProduct, isPromo } from '../../utils/product';
 
 const CATEGORY_CONFIG = [
   { group: 'Sacs', subcategories: [] },
-  { group: 'Chaussures', subcategories: ['Femme', 'Homme', 'Bébé'] },
+  { group: 'Chaussures', subcategories: ['Femme', 'Homme', 'Bebe'] },
   { group: 'Accessoires', subcategories: ['Colliers', 'Bagues', 'Bracelets'] },
-  { group: 'Vêtements', subcategories: ['Robes', 'Abayas', 'Voiles & Hijabs'] },
+  { group: 'Vetements', subcategories: ['Robes', 'Abayas', 'Voiles & Hijabs'] },
 ];
 
 const COLOR_PRESETS = ['#000000', '#ffffff', '#d6b27a', '#db2777', '#8b5cf6', '#10b981', '#0f172a', '#f59e0b'];
@@ -103,7 +103,7 @@ const AdminProducts = () => {
     if (['sac', 'sacs'].includes(key)) return 'Sacs';
     if (['chaussure', 'chaussures'].includes(key)) return 'Chaussures';
     if (['accessoire', 'accessoires'].includes(key)) return 'Accessoires';
-    if (['vetement', 'vetements'].includes(key)) return 'Vêtements';
+    if (['vetement', 'vetements'].includes(key)) return 'Vetements';
     for (const cfg of CATEGORY_CONFIG) {
       if (cfg.subcategories.some(sub => normalize(sub) === key)) return cfg.group;
     }
@@ -186,7 +186,7 @@ const AdminProducts = () => {
       categoryGroup: value,
       subcategory: cfg.subcategories[0] || ''
     }));
-    if (value !== 'Chaussures' && value !== 'Vêtements') {
+    if (value !== 'Chaussures' && value !== 'Vetements') {
       setSizesInput('');
     }
   };
@@ -240,7 +240,7 @@ const AdminProducts = () => {
     const colors = (formData.colors || []).map(c => c.trim()).filter(Boolean);
     const sizes = parseList(sizesInput);
     const images = formData.images?.length ? formData.images : (formData.image ? [formData.image] : []);
-    const requiresSizes = formData.categoryGroup === 'Chaussures' || formData.categoryGroup === 'Vêtements';
+    const requiresSizes = formData.categoryGroup === 'Chaussures' || formData.categoryGroup === 'Vetements';
     const sizeLabel = formData.categoryGroup === 'Chaussures' ? 'pointures' : 'tailles';
 
     if (images.length === 0) {
@@ -330,7 +330,7 @@ const AdminProducts = () => {
   const currentGroup = formData.categoryGroup || defaultGroup.group;
   const currentConfig = CATEGORY_CONFIG.find(c => c.group === currentGroup) || defaultGroup;
   const showSubcategories = currentConfig.subcategories.length > 0;
-  const requiresSizes = currentGroup === 'Chaussures' || currentGroup === 'Vêtements';
+  const requiresSizes = currentGroup === 'Chaussures' || currentGroup === 'Vetements';
   const sizeLabel = currentGroup === 'Chaussures' ? 'Pointures' : 'Tailles';
 
   return (

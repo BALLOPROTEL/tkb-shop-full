@@ -84,7 +84,7 @@ const Navbar = () => {
 
     // 2. STRUCTURE COMPLETE DES CATEGORIES (Aucune coupe)
     const navLinks = [
-        { name: 'Nouveautés', path: '/' },
+        { name: 'Nouveautes', path: '/' },
         { name: 'Sacs', path: '/shop/sacs' },
         {
             name: 'Chaussures',
@@ -92,7 +92,7 @@ const Navbar = () => {
             subLinks: [
                 { name: 'Femme', path: '/shop/chaussures/femme' },
                 { name: 'Homme', path: '/shop/chaussures/homme' },
-                { name: 'Bébé', path: '/shop/chaussures/bebe' }
+                { name: 'Bebe', path: '/shop/chaussures/bebe' }
             ]
         },
         {
@@ -105,7 +105,7 @@ const Navbar = () => {
             ]
         },
         {
-            name: 'Vêtements',
+            name: 'Vetements',
             path: '/shop/vetements',
             subLinks: [
                 { name: 'Robes', path: '/shop/vetements/robes' },
