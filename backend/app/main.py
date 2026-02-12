@@ -16,12 +16,19 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import stripe
+import sentry_sdk
 from dotenv import load_dotenv # Indispensable pour lire le fichier .env
-
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 # --- 1. CONFIGURATION ET CHARGEMENT ---
 # Rigueur : Charger le .env avant toute chose
 env_path = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=env_path)
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    integrations=[FastApiIntegration()],
+    traces_sample_rate=0.1,
+    send_default_pii=False
+)
 
 SECRET_KEY = os.getenv("JWT_SECRET", "TKB_PRIVATE_KEY_2026_SECURE_99_STAY_RIGOROUS")
 ALGORITHM = "HS256"
@@ -444,9 +451,9 @@ def update_order_status(id: str, data: dict, admin: dict = Depends(get_current_a
 
 @app.post("/api/payments/create-stripe-session")
 async def create_stripe_session(data: dict, user: dict = Depends(get_current_user)):
-    # V?rification de la cl? API avant de continuer
+    # Vérification de la clé API avant de continuer
     if not stripe.api_key:
-        raise HTTPException(status_code=500, detail="Cl? API Stripe non configur?e au serveur")
+        raise HTTPException(status_code=500, detail="Clé API Stripe non configurée au serveur")
     
     try:
         order_id = data.get("orderId")
@@ -459,8 +466,12 @@ async def create_stripe_session(data: dict, user: dict = Depends(get_current_use
         if order.get("userId") != user.get("id"):
             raise HTTPException(status_code=403, detail="Commande non autorisee")
 
+        items = order.get("items") or []
+        if not items:
+            raise HTTPException(status_code=400, detail="Commande vide")
+
         line_items = []
-        for item in order.get("items", []):
+        for item in items:
             unit_amount = int(round(float(item.get('price', 0)) * STRIPE_AMOUNT_MULTIPLIER))
             line_items.append({
                 'price_data': {
