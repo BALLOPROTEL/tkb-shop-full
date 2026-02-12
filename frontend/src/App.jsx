@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { CartProvider } from './context/CartContext';
@@ -7,7 +7,6 @@ import { FavoritesProvider } from './context/FavoritesContext';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ScrollToTop from './components/layout/ScrollToTop';
-import AuthModal from './components/auth/AuthModal';
 
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
@@ -18,6 +17,8 @@ import UserProfile from './pages/UserProfile';
 import PaymentSuccess from './pages/PaymentSuccess';
 import CategoryPage from './pages/CategoryPage';
 import Favorites from './pages/Favorites';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
 import Contact from './pages/legal/Contact';
 
 import AdminLayout from './components/admin/AdminLayout';
@@ -35,16 +36,17 @@ const ProtectedRoute = ({ children, isAdmin = false }) => {
 };
 
 const AppContent = () => {
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith('/admin');
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {!isAdminPath && <Navbar onOpenAuth={() => setIsAuthOpen(true)} />}
+      {!isAdminPath && <Navbar />}
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/shop/:category" element={<CategoryPage />} />
           <Route path="/shop/:category/:subcategory" element={<CategoryPage />} />
           <Route path="/product/:id" element={<ProductDetails />} />
@@ -63,7 +65,6 @@ const AppContent = () => {
         </Routes>
       </main>
       {!isAdminPath && <Footer />}
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 };

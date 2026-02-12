@@ -17,7 +17,7 @@ import { useCart } from '../../context/CartContext';
 import api from '../../api'; // Instance Axios Expert
 import { useFavorites } from '../../context/FavoritesContext';
 
-const Navbar = ({ onOpenAuth }) => {
+const Navbar = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -154,28 +154,28 @@ const Navbar = ({ onOpenAuth }) => {
                     <div className="flex items-center justify-end gap-2 sm:gap-4">
                         <button
                             onClick={handleSearchClick}
-                            className="p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
                             aria-label="Rechercher"
                         >
-                            <Search size={18} strokeWidth={1.5} />
+                            <Search size={18} strokeWidth={1.5} className="text-slate-900" />
                         </button>
 
                         <div className="relative" ref={profileRef}>
                             {user ? (
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className="p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
+                                    className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
                                 >
-                                    <User size={18} strokeWidth={1.5} />
+                                    <User size={18} strokeWidth={1.5} className="text-slate-900" />
                                 </button>
                             ) : (
-                                <button
-                                    onClick={onOpenAuth}
-                                    className="p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
+                                <Link
+                                    to="/login"
+                                    className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
                                     aria-label="Se connecter"
                                 >
-                                    <User size={18} strokeWidth={1.5} />
-                                </button>
+                                    <User size={18} strokeWidth={1.5} className="text-slate-900" />
+                                </Link>
                             )}
 
                             {isProfileOpen && (
@@ -198,8 +198,8 @@ const Navbar = ({ onOpenAuth }) => {
                             )}
                         </div>
 
-                        <Link to="/favorites" className="relative p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
-                            <Heart size={18} strokeWidth={1.5} />
+                        <Link to="/favorites" className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
+                            <Heart size={18} strokeWidth={1.5} className="text-slate-900" />
                             {favoritesCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black">
                                     {favoritesCount}
@@ -207,8 +207,8 @@ const Navbar = ({ onOpenAuth }) => {
                             )}
                         </Link>
 
-                        <Link to="/cart" className="relative p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
-                            <ShoppingBag size={18} strokeWidth={1.5} />
+                        <Link to="/cart" className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
+                            <ShoppingBag size={18} strokeWidth={1.5} className="text-slate-900" />
                             {cartCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black animate-pulse">
                                     {cartCount}
@@ -262,13 +262,14 @@ const Navbar = ({ onOpenAuth }) => {
                                     <span className="text-[11px] font-semibold">Mon compte</span>
                                 </Link>
                             ) : (
-                                <button
-                                    onClick={() => { setIsMobileMenuOpen(false); onOpenAuth(); }}
+                                <Link
+                                    to="/login"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                     className="border border-slate-200 rounded-2xl px-3 py-4 flex flex-col items-center gap-2 text-slate-900 hover:border-pink-400 transition-colors"
                                 >
                                     <User size={20} />
                                     <span className="text-[11px] font-semibold">Se connecter</span>
-                                </button>
+                                </Link>
                             )}
                             <Link
                                 to="/contact"
