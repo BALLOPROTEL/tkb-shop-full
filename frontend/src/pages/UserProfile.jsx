@@ -75,7 +75,7 @@ const UserProfile = () => {
     if (!user) return null;
 
     return (
-        <div className="min-h-screen bg-slate-50 pt-32 pb-20 px-6">
+        <div className="min-h-screen bg-slate-50 pt-32 pb-20 px-4 sm:px-6">
             <div className="max-w-4xl mx-auto bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 md:p-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
                 {/* En-tête Profil */}
@@ -145,7 +145,7 @@ const UserProfile = () => {
                         </div>
 
                         {/* Actions */}
-                        <div className="mt-12 flex justify-end gap-4">
+                        <div className="mt-12 flex flex-col sm:flex-row justify-end gap-4">
                             {isEditing && (
                                 <button
                                     onClick={() => setIsEditing(false)}
@@ -264,3 +264,5 @@ const UserProfile = () => {
 };
 
 export default UserProfile;
+
+

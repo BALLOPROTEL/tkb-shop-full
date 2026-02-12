@@ -25,13 +25,13 @@ const Cart = () => {
 
     return (
         <div className="min-h-screen bg-white pt-32 pb-20">
-            <div className="container mx-auto px-6 lg:px-12 max-w-7xl">
-                <h1 className="text-4xl font-serif text-slate-900 mb-12 border-b border-pink-50 pb-8">Sélection Privée</h1>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-7xl">
+                <h1 className="text-3xl sm:text-4xl font-serif text-slate-900 mb-12 border-b border-pink-50 pb-8">Sélection Privée</h1>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-16">
                     <div className="lg:col-span-2 space-y-10">
                         {cart.map((item) => (
-                            <div key={`${item.id}-${item.selectedSize}-${item.selectedColor || 'no-color'}`} className="flex gap-8 items-center border-b border-gray-50 pb-10">
-                                <img src={item.image} alt={item.name} className="w-24 aspect-[3/4] object-cover bg-slate-50 rounded-lg" />
+                            <div key={`${item.id}-${item.selectedSize}-${item.selectedColor || 'no-color'}`} className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start sm:items-center border-b border-gray-50 pb-10">
+                                <img src={item.image} alt={item.name} className="w-20 sm:w-24 aspect-[3/4] object-cover bg-slate-50 rounded-lg" />
                                 <div className="flex-1 space-y-4">
                                     <div className="flex justify-between items-start">
                                         <div>
@@ -52,14 +52,14 @@ const Cart = () => {
                             </div>
                         ))}
                     </div>
-                    <div className="bg-[#fcfaf7] p-10 rounded-3xl h-fit sticky top-40 space-y-8 shadow-sm border border-pink-50">
+                    <div className="bg-[#fcfaf7] p-6 sm:p-10 rounded-3xl h-fit lg:sticky lg:top-40 space-y-8 shadow-sm border border-pink-50">
                         <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-center border-b border-pink-100 pb-4">Résumé</h3>
                         <div className="space-y-4 text-sm font-medium">
                             <div className="flex justify-between text-slate-400"><span>Sous-total</span><span className="text-slate-900">{cartTotal.toLocaleString()} F</span></div>
                             <div className="flex justify-between text-slate-400"><span>Livraison</span><span className="text-slate-900">{shippingCost === 0 ? "GRATUIT" : `${shippingCost.toLocaleString()} F`}</span></div>
                             <div className="flex justify-between items-center pt-6 border-t border-pink-100 text-xl font-serif"><span>Total</span><span className="text-pink-600">{finalTotal.toLocaleString()} F CFA</span></div>
                         </div>
-                        <button onClick={() => user ? navigate('/checkout') : toast.error("Identifiez-vous d'abord")} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-pink-600 transition-all shadow-xl shadow-slate-200">Passer à la caisse</button>
+                        <button onClick={() => user ? navigate('/checkout') : toast.error("Identifiez-vous d'abord")} className="w-full bg-slate-900 text-white py-4 sm:py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-pink-600 transition-all shadow-xl shadow-slate-200">Passer à la caisse</button>
                     </div>
                 </div>
             </div>
@@ -68,3 +68,4 @@ const Cart = () => {
 };
 
 export default Cart;
+

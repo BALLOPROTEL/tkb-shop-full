@@ -113,18 +113,18 @@ const CategoryPage = () => {
     };
 
     return (
-        <div className="bg-white min-h-screen pt-40 pb-20">
-            <div className="container mx-auto px-6 lg:px-12">
+        <div className="bg-white min-h-screen pt-28 sm:pt-36 lg:pt-40 pb-20">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-12">
 
                 {/* En-tête de catégorie luxe */}
                 <div className="text-center mb-20 space-y-4">
                     <div className="flex items-center justify-center gap-2 text-pink-400">
                         <Sparkles size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em]">
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.4em]">
                             {categoryLabel} {subcategoryLabel && `• ${subcategoryLabel}`}
                         </span>
                     </div>
-                    <h1 className="text-4xl md:text-6xl font-serif text-slate-900 capitalize">
+                    <h1 className="text-3xl sm:text-4xl md:text-6xl font-serif text-slate-900 capitalize">
                         {subcategoryLabel || categoryLabel}
                     </h1>
                     <p className="text-slate-400 text-sm font-light italic">
@@ -139,7 +139,7 @@ const CategoryPage = () => {
                             <select
                                 value={activeSubcategory}
                                 onChange={(e) => setActiveSubcategory(e.target.value)}
-                                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600"
+                                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600 w-full sm:w-auto"
                             >
                                 <option value="Tout">Toutes sous-catégories</option>
                                 {availableSubcategories.map((sub) => (
@@ -153,14 +153,14 @@ const CategoryPage = () => {
                                     value={priceMin}
                                     onChange={(e) => setPriceMin(e.target.value)}
                                     placeholder="Prix min"
-                                    className="w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600"
+                                    className="w-full sm:w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600"
                                 />
                                 <input
                                     type="number"
                                     value={priceMax}
                                     onChange={(e) => setPriceMax(e.target.value)}
                                     placeholder="Prix max"
-                                    className="w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600"
+                                    className="w-full sm:w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600"
                                 />
                             </div>
 
@@ -169,7 +169,7 @@ const CategoryPage = () => {
                                 <select
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
-                                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600"
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-600 w-full sm:w-auto"
                                 >
                                     <option value="recent">Récents</option>
                                     <option value="price-asc">Prix croissant</option>
@@ -198,7 +198,7 @@ const CategoryPage = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16">
                             {pageItems.map((product) => {
                                 const displayImages = product.images?.length > 0 ? product.images : [product.image];
                                 const promo = isPromo(product);
@@ -278,3 +278,6 @@ const CategoryPage = () => {
 };
 
 export default CategoryPage;
+
+
+

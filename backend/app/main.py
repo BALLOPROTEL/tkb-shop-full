@@ -16,19 +16,11 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import stripe
-import sentry_sdk
 from dotenv import load_dotenv # Indispensable pour lire le fichier .env
-from sentry_sdk.integrations.fastapi import FastApiIntegration
 # --- 1. CONFIGURATION ET CHARGEMENT ---
 # Rigueur : Charger le .env avant toute chose
 env_path = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=env_path)
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    integrations=[FastApiIntegration()],
-    traces_sample_rate=0.1,
-    send_default_pii=False
-)
 
 SECRET_KEY = os.getenv("JWT_SECRET", "TKB_PRIVATE_KEY_2026_SECURE_99_STAY_RIGOROUS")
 ALGORITHM = "HS256"

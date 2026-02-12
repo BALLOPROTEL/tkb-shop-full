@@ -30,7 +30,7 @@ const Favorites = () => {
 
     if (favorites.length === 0) {
         return (
-            <div className="min-h-screen bg-white pt-32 pb-20 px-6 flex items-center justify-center">
+            <div className="min-h-screen bg-white pt-32 pb-20 px-4 sm:px-6 flex items-center justify-center">
                 <div className="text-center space-y-4">
                     <Heart size={48} className="mx-auto text-pink-300" />
                     <h1 className="text-2xl font-serif text-slate-900">Aucun favori pour le moment</h1>
@@ -42,17 +42,17 @@ const Favorites = () => {
     }
 
     return (
-        <div className="min-h-screen bg-white pt-32 pb-20 px-6">
+        <div className="min-h-screen bg-white pt-32 pb-20 px-4 sm:px-6">
             <div className="container mx-auto max-w-6xl">
                 <div className="text-center mb-10 space-y-3">
                     <div className="flex items-center justify-center gap-2 text-pink-400">
                         <Heart size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em]">Favoris</span>
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.4em]">Favoris</span>
                     </div>
                     <h1 className="text-4xl md:text-5xl font-serif text-slate-900">Mes pièces aimées</h1>
                 </div>
 
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                     <p className="text-sm text-slate-500">{favorites.length} produit(s)</p>
                     <div className="flex items-center gap-2">
                         <ArrowUpDown size={14} className="text-slate-400" />
@@ -139,3 +139,5 @@ const Favorites = () => {
 };
 
 export default Favorites;
+
+

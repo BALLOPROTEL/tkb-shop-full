@@ -42,14 +42,14 @@ const MyOrders = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white pt-32 pb-20 px-6">
+    <div className="min-h-screen bg-white pt-32 pb-20 px-4 sm:px-6">
       <div className="container mx-auto max-w-5xl">
         <div className="text-center mb-16 space-y-4">
           <div className="flex items-center justify-center gap-2 text-pink-400">
             <Sparkles size={16} />
-            <span className="text-[10px] font-black uppercase tracking-[0.4em]">Historique Privé</span>
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.4em]">Historique Privé</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif text-slate-900">Mes Commandes</h1>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif text-slate-900">Mes Commandes</h1>
           <div className="w-12 h-[1px] bg-pink-200 mx-auto"></div>
         </div>
 
@@ -98,3 +98,5 @@ const MyOrders = () => {
 };
 
 export default MyOrders;
+
+

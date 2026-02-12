@@ -18,7 +18,7 @@ const Footer = () => {
         <footer className="bg-white">
             {/* 1. SECTION RÉASSURANCE (Rose Poudré) */}
             <div className="bg-[#fff0f5] py-16 border-t border-pink-100">
-                <div className="container mx-auto px-6">
+                <div className="container mx-auto px-4 sm:px-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
                         <div className="flex flex-col items-center space-y-4 group">
                             <div className="p-4 bg-white rounded-full text-pink-600 shadow-sm group-hover:scale-110 transition-transform duration-300">
@@ -55,7 +55,7 @@ const Footer = () => {
 
             {/* 2. CORPS DU FOOTER */}
             <div className="bg-white pt-20 pb-10 border-t border-gray-50">
-                <div className="container mx-auto px-6 lg:px-12">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-12">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
 
                         {/* Colonne 1 : Brand Identity */}

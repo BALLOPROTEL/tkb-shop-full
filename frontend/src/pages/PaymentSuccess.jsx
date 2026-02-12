@@ -40,7 +40,7 @@ const PaymentSuccess = () => {
   }, [clearCart]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-6 py-20 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4 sm:px-6 py-20 relative overflow-hidden">
 
       {/* Design Minimaliste Rose Poudré */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
@@ -66,9 +66,9 @@ const PaymentSuccess = () => {
         {/* Message de Succès */}
         <div className="space-y-5">
           <div className="flex items-center justify-center gap-2 text-pink-500">
-            <span className="text-[10px] font-black uppercase tracking-[0.6em]">Paiement Confirmé</span>
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.6em]">Paiement Confirmé</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-serif text-slate-900 leading-[1.1]">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-serif text-slate-900 leading-[1.1]">
             Votre commande est <br />
             <span className="italic text-pink-600">en chemin.</span>
           </h1>
@@ -86,21 +86,21 @@ const PaymentSuccess = () => {
           <div className="flex flex-col sm:flex-row gap-5">
             <button
               onClick={() => navigate('/my-orders')}
-              className="flex-1 flex items-center justify-center gap-3 bg-slate-900 text-white py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] hover:bg-pink-600 transition-all duration-500 shadow-xl shadow-slate-200"
+              className="flex-1 flex items-center justify-center gap-3 bg-slate-900 text-white py-4 sm:py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] hover:bg-pink-600 transition-all duration-500 shadow-xl shadow-slate-200"
             >
               <ShoppingBag size={16} /> Suivre mes achats
             </button>
 
             <button
               onClick={() => navigate('/')}
-              className="flex-1 flex items-center justify-center gap-3 border-2 border-slate-100 text-slate-900 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] hover:bg-slate-50 transition-all duration-300"
+              className="flex-1 flex items-center justify-center gap-3 border-2 border-slate-100 text-slate-900 py-4 sm:py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] hover:bg-slate-50 transition-all duration-300"
             >
               Retour à l'accueil <ArrowRight size={16} />
             </button>
           </div>
         </div>
 
-        <p className="text-[10px] text-slate-300 uppercase tracking-[0.4em] font-black pt-6">
+        <p className="text-[10px] text-slate-300 uppercase tracking-[0.25em] sm:tracking-[0.4em] font-black pt-6">
           TKB_SHOP • L'excellence au féminin
         </p>
       </div>

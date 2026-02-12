@@ -54,6 +54,15 @@ h3,
   text-transform: uppercase;
 }
 
+@media (max-width: 640px) {
+  h1,
+  h2,
+  h3,
+  .tracking-luxury {
+    letter-spacing: 0.08em !important;
+  }
+}
+
 /* Animation de la barre de pub */
 @keyframes marquee {
   0% {

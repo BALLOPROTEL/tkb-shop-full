@@ -27,14 +27,14 @@ const AdminUsers = () => {
   };
 
   return (
-    <div className="p-6 bg-slate-950 min-h-screen text-slate-200">
+    <div className="p-4 sm:p-6 bg-slate-950 min-h-screen text-slate-200">
       <h1 className="text-3xl font-bold flex items-center gap-3 mb-8"><Users className="text-blue-500" /> Base Clients</h1>
       <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 mb-6 flex items-center gap-3">
         <Search className="text-slate-400" size={20} />
         <input type="text" placeholder="Email ou Nom..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-transparent outline-none" />
       </div>
-      <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-        <table className="w-full text-left">
+      <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto">
+        <table className="w-full text-left min-w-[700px]">
           <thead className="bg-slate-950 text-slate-500 text-xs font-bold uppercase">
             <tr><th className="p-6">Utilisateur</th><th className="p-6">Email</th><th className="p-6">Rôle</th><th className="p-6 text-right">Action</th></tr>
           </thead>
@@ -61,3 +61,4 @@ const AdminUsers = () => {
 };
 
 export default AdminUsers;
+

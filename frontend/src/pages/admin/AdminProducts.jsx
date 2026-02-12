@@ -45,6 +45,47 @@ const AdminProducts = () => {
   const [colorInput, setColorInput] = useState('#000000');
   const [colorNameInput, setColorNameInput] = useState('');
 
+  const compressImage = (file, options = {}) => new Promise((resolve, reject) => {
+    const maxSize = options.maxSize || 1600;
+    const quality = typeof options.quality === 'number' ? options.quality : 0.82;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const width = Math.round(img.width * scale);
+        const height = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const outputType = 'image/webp';
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url);
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const name = file.name.replace(/\.\w+$/, '.webp');
+          resolve(new File([blob], name, { type: blob.type }));
+        }, outputType, quality);
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      }
+    };
+
+    img.onerror = (err) => {
+      URL.revokeObjectURL(url);
+      reject(err);
+    };
+
+    img.src = url;
+  });
+
   const fetchProducts = async () => {
     try {
       const res = await api.get('/api/products');
@@ -107,12 +148,14 @@ const AdminProducts = () => {
   };
 
   const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     setUploading(true);
     try {
       for (const file of files) {
+        const optimizedFile = await compressImage(file, { maxSize: 1600, quality: 0.82 });
         const data = new FormData();
-        data.append("file", file);
+        data.append("file", optimizedFile);
         data.append("upload_preset", "ml_default");
         const res = await fetch(`https://api.cloudinary.com/v1_1/dq5uba810/image/upload`, { method: "POST", body: data });
         const fileData = await res.json();
@@ -291,7 +334,7 @@ const AdminProducts = () => {
   const sizeLabel = currentGroup === 'Chaussures' ? 'Pointures' : 'Tailles';
 
   return (
-    <div className="p-6 bg-slate-950 min-h-screen text-slate-200">
+    <div className="p-4 sm:p-6 bg-slate-950 min-h-screen text-slate-200">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3"><Package className="text-blue-500" /> Catalogue</h1>
         <button onClick={openCreate} className="bg-blue-600 px-6 py-2 rounded-xl font-bold">+ Ajouter</button>
@@ -520,3 +563,4 @@ const AdminProducts = () => {
 };
 
 export default AdminProducts;
+

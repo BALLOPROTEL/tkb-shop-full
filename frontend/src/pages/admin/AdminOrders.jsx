@@ -46,7 +46,7 @@ const AdminOrders = () => {
   const filtered = orders.filter(o => o.id.includes(searchTerm) || (o.userName && o.userName.toLowerCase().includes(searchTerm.toLowerCase())));
 
   return (
-    <div className="p-6 bg-slate-950 min-h-screen text-slate-200">
+    <div className="p-4 sm:p-6 bg-slate-950 min-h-screen text-slate-200">
       <h1 className="text-3xl font-bold text-white flex items-center gap-3 mb-8">
         <Package className="text-blue-500" /> Commandes Clients
       </h1>
@@ -56,8 +56,8 @@ const AdminOrders = () => {
         <input type="text" placeholder="Recherche..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-transparent outline-none text-white" />
       </div>
 
-      <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-2xl">
-        <table className="w-full text-left">
+      <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-x-auto shadow-2xl">
+        <table className="w-full text-left min-w-[900px]">
           <thead className="bg-slate-950 text-slate-500 text-xs font-bold uppercase">
             <tr>
               <th className="p-6">ID / Date</th>
@@ -94,3 +94,4 @@ const AdminOrders = () => {
 };
 
 export default AdminOrders;
+

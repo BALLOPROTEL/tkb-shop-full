@@ -57,12 +57,12 @@ const ProductDetails = () => {
 
     return (
         <div className="bg-white min-h-screen pt-32">
-            <div className="container mx-auto px-6 lg:px-12 max-w-7xl">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-7xl">
                 <button onClick={() => navigate(-1)} className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-slate-400 hover:text-pink-600 transition-all mb-12">
                     <ArrowLeft size={14} /> Retour
                 </button>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-24">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 mb-24">
                     <div className="lg:col-span-5 space-y-4">
                         <Swiper
                             style={{ '--swiper-navigation-color': '#000', '--swiper-pagination-color': '#db2777' }}
@@ -76,7 +76,16 @@ const ProductDetails = () => {
                                 <SwiperSlide key={index}><img src={img} className="w-full h-full object-cover" alt="" /></SwiperSlide>
                             ))}
                         </Swiper>
-                        <Swiper onSwiper={setThumbsSwiper} spaceBetween={10} slidesPerView={5} freeMode={true} watchSlidesProgress={true} modules={[FreeMode, Navigation, Thumbs]} className="h-20">
+                        <Swiper
+                            onSwiper={setThumbsSwiper}
+                            spaceBetween={10}
+                            slidesPerView={3}
+                            breakpoints={{ 640: { slidesPerView: 4 }, 1024: { slidesPerView: 5 } }}
+                            freeMode={true}
+                            watchSlidesProgress={true}
+                            modules={[FreeMode, Navigation, Thumbs]}
+                            className="h-16 sm:h-20"
+                        >
                             {displayImages.map((img, index) => (
                                 <SwiperSlide key={index} className="cursor-pointer border border-pink-50 opacity-50 hover:opacity-100 transition-opacity">
                                     <img src={img} className="w-full h-full object-cover" alt="" />
@@ -133,3 +142,4 @@ const ProductDetails = () => {
 };
 
 export default ProductDetails;
+

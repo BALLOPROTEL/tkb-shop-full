@@ -46,13 +46,13 @@ const Home = () => {
     return (
         <div className="bg-white min-h-screen">
             <Hero searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
-            <div className="container mx-auto px-6 lg:px-12 py-20">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-12 py-12 sm:py-20">
                 <div className="text-center mb-20 space-y-4">
                     <div className="flex items-center justify-center gap-2 text-pink-500 animate-pulse">
                         <Sparkles size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em]">Sélection exclusive</span>
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.4em]">Sélection exclusive</span>
                     </div>
-                    <h2 className="text-4xl md:text-5xl font-serif text-slate-900">Pièces d'Exception</h2>
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-slate-900">Pièces d'Exception</h2>
                     <div className="w-12 h-[1px] bg-pink-200 mx-auto"></div>
                 </div>
 
@@ -62,7 +62,7 @@ const Home = () => {
                     </div>
                 ) : (
                     <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10 sm:gap-x-8 sm:gap-y-16">
                         {pageItems.map((product) => {
                             const displayImages = product.images?.length > 0 ? product.images : [product.image];
                             return (
@@ -139,3 +139,4 @@ const Home = () => {
 };
 
 export default Home;
+

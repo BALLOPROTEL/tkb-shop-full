@@ -142,14 +142,14 @@ const DashboardHome = () => {
                     <h1 className="text-3xl font-bold text-white tracking-tight">Console de Commande</h1>
                     <p className="text-slate-500 text-sm">Monitoring des flux de vente en temps réel.</p>
                 </div>
-                <div className="flex bg-slate-900 border border-slate-800 p-2 rounded-2xl items-center gap-3">
+                <div className="flex flex-col sm:flex-row bg-slate-900 border border-slate-800 p-2 rounded-2xl items-center gap-3 w-full sm:w-auto">
                     <Megaphone size={18} className="text-blue-400 ml-2" />
                     <input
                         type="text" value={bannerText}
                         onChange={(e) => setBannerText(e.target.value)}
-                        className="bg-transparent border-none outline-none text-xs text-slate-300 w-48"
+                        className="bg-transparent border-none outline-none text-xs text-slate-300 w-full sm:w-48"
                     />
-                    <button onClick={saveBanner} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-500 transition-all">Mettre à jour</button>
+                    <button onClick={saveBanner} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-500 transition-all w-full sm:w-auto">Mettre à jour</button>
                 </div>
             </div>
 
@@ -173,7 +173,7 @@ const DashboardHome = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Section Graphiques Dynamiques */}
-                <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl h-[450px] flex flex-col">
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl h-auto lg:h-[450px] min-h-[320px] flex flex-col">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-white text-sm uppercase tracking-wider">Graphique</h3>
 
@@ -206,15 +206,15 @@ const DashboardHome = () => {
                 </div>
 
                 {/* ANALYSE DES VENTES RÉCENTES */}
-                <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col h-[450px]">
+                <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col h-auto lg:h-[450px]">
                     <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                         <h3 className="font-bold text-white text-sm uppercase tracking-wider flex items-center gap-2">
                             <ArrowUpRight size={18} className="text-emerald-400" /> Analyse des Ventes
                         </h3>
                         <span className="text-[10px] bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-bold">Flux en direct</span>
                     </div>
-                    <div className="flex-1 overflow-auto">
-                        <table className="w-full text-left">
+                    <div className="flex-1 overflow-auto overflow-x-auto">
+                        <table className="w-full text-left min-w-[650px]">
                             <thead className="bg-slate-950/50 text-slate-500 text-[10px] uppercase font-bold tracking-widest">
                                 <tr>
                                     <th className="px-6 py-4">Produit</th>
@@ -287,3 +287,4 @@ const DashboardHome = () => {
 };
 
 export default DashboardHome;
+

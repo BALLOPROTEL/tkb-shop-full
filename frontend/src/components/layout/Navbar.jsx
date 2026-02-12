@@ -97,20 +97,20 @@ const Navbar = ({ onOpenAuth }) => {
     return (
         <header className="fixed top-0 w-full z-50 transition-all duration-500">
             {/* BANDEAU ANNONCE DYNAMIQUE */}
-            <div className="bg-slate-950 text-white py-2.5 text-[9px] tracking-[0.4em] font-black text-center uppercase border-b border-white/5">
+            <div className="bg-slate-950 text-white py-2 sm:py-2.5 text-[8px] sm:text-[9px] tracking-[0.25em] sm:tracking-[0.4em] font-black text-center uppercase border-b border-white/5 px-2 sm:px-0 leading-relaxed">
                 {bannerText}
             </div>
 
             {/* NAVIGATION PRINCIPALE */}
             <nav className={`transition-all duration-500 ${isScrolled
-                    ? 'bg-white/95 backdrop-blur-md py-4 shadow-sm border-b border-slate-100'
-                    : 'bg-transparent py-7 border-b border-transparent'
+                    ? 'bg-white/95 backdrop-blur-md py-3 sm:py-4 shadow-sm border-b border-slate-100'
+                    : 'bg-transparent py-4 sm:py-7 border-b border-transparent'
                 }`}>
-                <div className="container mx-auto px-8 flex items-center justify-between">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-12 flex items-center justify-between">
 
                     {/* GAUCHE : Logo & Hamburger */}
-                    <div className="flex items-center gap-8">
-                        <button className="md:hidden text-slate-900" onClick={() => setIsMobileMenuOpen(true)}>
+                    <div className="flex items-center gap-6 sm:gap-8">
+                        <button className="lg:hidden text-slate-900" onClick={() => setIsMobileMenuOpen(true)}>
                             <Menu size={24} strokeWidth={1.5} />
                         </button>
 
@@ -122,7 +122,7 @@ const Navbar = ({ onOpenAuth }) => {
                     </div>
 
                     {/* MILIEU : Liens avec Dropdowns Sophistiqués */}
-                    <div className="hidden md:flex items-center gap-10">
+                    <div className="hidden lg:flex items-center gap-6 xl:gap-10">
                         {navLinks.map(link => (
                             <div
                                 key={link.name}
@@ -158,26 +158,27 @@ const Navbar = ({ onOpenAuth }) => {
                     </div>
 
                     {/* DROITE : Actions Utilisateur */}
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         <div className="relative" ref={profileRef}>
                             {user ? (
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                    className="p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
+                                    className="p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
                                 >
-                                    <User size={19} strokeWidth={1.5} />
+                                    <User size={18} strokeWidth={1.5} />
                                 </button>
                             ) : (
                                 <button
                                     onClick={onOpenAuth}
-                                    className="text-[10px] uppercase tracking-[0.2em] font-black bg-slate-900 text-white px-6 py-2.5 hover:bg-pink-600 transition-all shadow-lg shadow-slate-200"
+                                    className="p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full"
+                                    aria-label="Se connecter"
                                 >
-                                    Se connecter
+                                    <User size={18} strokeWidth={1.5} />
                                 </button>
                             )}
 
                             {isProfileOpen && (
-                                <div className="absolute right-0 mt-6 w-52 bg-white border border-slate-100 shadow-2xl py-3 rounded-xl animate-in fade-in zoom-in duration-200">
+                                <div className="absolute right-0 mt-6 w-48 sm:w-52 bg-white border border-slate-100 shadow-2xl py-3 rounded-xl animate-in fade-in zoom-in duration-200">
                                     <div className="px-6 py-3 border-b border-slate-50 mb-2">
                                         <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Compte</p>
                                         <p className="text-xs font-bold text-slate-900 truncate">{user?.name}</p>
@@ -196,8 +197,8 @@ const Navbar = ({ onOpenAuth }) => {
                             )}
                         </div>
 
-                        <Link to="/favorites" className="relative p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
-                            <Heart size={19} strokeWidth={1.5} />
+                        <Link to="/favorites" className="relative p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
+                            <Heart size={18} strokeWidth={1.5} />
                             {favoritesCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black">
                                     {favoritesCount}
@@ -205,8 +206,8 @@ const Navbar = ({ onOpenAuth }) => {
                             )}
                         </Link>
 
-                        <Link to="/cart" className="relative p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
-                            <ShoppingBag size={19} strokeWidth={1.5} />
+                        <Link to="/cart" className="relative p-1.5 sm:p-2 text-slate-900 hover:text-pink-600 transition-all bg-slate-50 rounded-full">
+                            <ShoppingBag size={18} strokeWidth={1.5} />
                             {cartCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[8px] w-4 h-4 flex items-center justify-center rounded-full font-black animate-pulse">
                                     {cartCount}
@@ -219,21 +220,21 @@ const Navbar = ({ onOpenAuth }) => {
 
             {/* MENU MOBILE PLEIN ÉCRAN */}
             {isMobileMenuOpen && (
-                <div className="fixed inset-0 bg-white z-[60] flex flex-col p-10 overflow-y-auto animate-in slide-in-from-left duration-500">
+                <div className="fixed inset-0 bg-white z-[60] flex flex-col p-6 sm:p-10 overflow-y-auto animate-in slide-in-from-left duration-500">
                     <div className="flex justify-end mb-10">
                         <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-slate-50 rounded-full">
                             <X size={28} strokeWidth={1.5} />
                         </button>
                     </div>
 
-                    <div className="space-y-8">
+                    <div className="space-y-6 sm:space-y-8">
                         {navLinks.map(link => (
                             <div key={link.name} className="space-y-4">
                                 <div className="flex items-center justify-between border-b border-slate-50 pb-2">
                                     <Link
                                         to={link.path}
                                         onClick={() => !link.subLinks && setIsMobileMenuOpen(false)}
-                                        className="text-2xl font-serif text-slate-900"
+                                        className="text-xl sm:text-2xl font-serif text-slate-900"
                                     >
                                         {link.name}
                                     </Link>
@@ -266,7 +267,7 @@ const Navbar = ({ onOpenAuth }) => {
                         {!user && (
                             <button
                                 onClick={() => { setIsMobileMenuOpen(false); onOpenAuth(); }}
-                                className="w-full bg-slate-900 text-white py-4 rounded-xl font-black uppercase tracking-widest"
+                                className="w-full bg-slate-900 text-white py-3 sm:py-4 rounded-xl font-black uppercase tracking-widest"
                             >
                                 Se connecter
                             </button>

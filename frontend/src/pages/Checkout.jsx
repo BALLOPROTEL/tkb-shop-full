@@ -83,8 +83,8 @@ const Checkout = () => {
 
     return (
         <div className="min-h-screen bg-white pt-32 pb-20">
-            <div className="container mx-auto px-6 max-w-5xl">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+            <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
 
                     {/* LIVRAISON */}
                     <div className="space-y-10 animate-in fade-in slide-in-from-left duration-700">
@@ -96,7 +96,7 @@ const Checkout = () => {
                                 onChange={(e) => setAddress({ ...address, fullName: e.target.value })} />
                             <input type="text" placeholder="Adresse complète" className="w-full border-b p-4 outline-none focus:border-pink-500 bg-pink-50/10"
                                 onChange={(e) => setAddress({ ...address, street: e.target.value })} />
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <input type="text" placeholder="Ville" className="w-full border-b p-4 outline-none focus:border-pink-500 bg-pink-50/10"
                                     onChange={(e) => setAddress({ ...address, city: e.target.value })} />
                                 <input type="text" placeholder="Téléphone" className="w-full border-b p-4 outline-none focus:border-pink-500 bg-pink-50/10"
@@ -106,7 +106,7 @@ const Checkout = () => {
                     </div>
 
                     {/* RÉCAPITULATIF & PAIEMENT */}
-                    <div className="bg-slate-50 p-8 rounded-3xl space-y-8 h-fit shadow-sm animate-in fade-in slide-in-from-right duration-700">
+                    <div className="bg-slate-50 p-6 sm:p-8 rounded-3xl space-y-8 h-fit shadow-sm animate-in fade-in slide-in-from-right duration-700">
                         <div className="flex justify-between items-end border-b pb-4">
                             <span className="text-sm text-slate-500 uppercase font-bold tracking-widest">Total à régler</span>
                             <span className="text-2xl font-serif text-pink-600">{(serverTotal ?? cartTotal).toLocaleString()} F CFA</span>
@@ -168,3 +168,4 @@ const Checkout = () => {
 };
 
 export default Checkout;
+

@@ -34,11 +34,11 @@ export default function ProductGrid() {
 
     return (
         <section className="py-20 bg-white">
-            <div className="container mx-auto px-6">
+            <div className="container mx-auto px-4 sm:px-6">
                 <div className="flex flex-wrap justify-center gap-4 mb-16">
                     {['Tout', 'Sacs', 'Chaussures', 'Vêtements', 'Accessoires'].map(cat => (
                         <button key={cat} onClick={() => { setActiveCategory(cat); setActiveSubcategory('Tout'); setCurrentPage(1); }}
-                            className={`px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all ${activeCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                            className={`px-5 sm:px-8 py-2 rounded-full text-[10px] sm:text-xs font-bold tracking-widest uppercase transition-all ${activeCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
                             {cat}
                         </button>
                     ))}
@@ -59,7 +59,7 @@ export default function ProductGrid() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 sm:gap-10">
                     {currentItems.map(product => (
                         <div key={product.id} className="group flex flex-col gap-4">
                             <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-slate-50 shadow-sm">
@@ -85,7 +85,7 @@ export default function ProductGrid() {
                                 <Link to={`/product/${product.id}`}>
                                     <img src={product.image} alt={product.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
                                 </Link>
-                                <button onClick={() => addToCart(product, 1)} className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur py-3 rounded-xl font-bold text-[10px] uppercase tracking-tighter opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all flex items-center justify-center gap-2">
+                                <button onClick={() => addToCart(product, 1)} className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur py-3 rounded-xl font-bold text-[10px] uppercase tracking-tighter opacity-100 sm:opacity-0 sm:group-hover:opacity-100 translate-y-0 sm:translate-y-4 sm:group-hover:translate-y-0 transition-all flex items-center justify-center gap-2">
                                     <ShoppingBag size={14} /> Ajouter au panier
                                 </button>
                             </div>
@@ -112,3 +112,4 @@ export default function ProductGrid() {
         </section>
     );
 }
+
