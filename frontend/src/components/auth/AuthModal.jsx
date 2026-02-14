@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Mail, Lock, User, Loader2, Sparkles } from 'lucide-react';
 import api from '../../api';
 import { toast } from 'react-hot-toast';
+import { setAuth } from '../../utils/authStorage';
 
 export default function AuthModal({ isOpen, onClose }) {
     const [loadingAction, setLoadingAction] = useState(null);
     const [loginData, setLoginData] = useState({ email: '', password: '' });
     const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
+    const [remember, setRemember] = useState(true);
+    const navigate = useNavigate();
 
     if (!isOpen) return null;
 
@@ -24,8 +28,7 @@ export default function AuthModal({ isOpen, onClose }) {
             const res = await api.post(endpoint, payload);
 
             if (mode === 'login') {
-                localStorage.setItem('user', JSON.stringify(res.data.user));
-                localStorage.setItem('access_token', res.data.access_token);
+                setAuth(res.data.user, res.data.access_token, remember);
                 toast.success(`Bienvenue ${res.data.user.name} !`);
                 onClose();
                 window.location.reload();
@@ -98,10 +101,22 @@ export default function AuthModal({ isOpen, onClose }) {
 
                             <div className="flex items-center justify-between text-xs text-slate-500">
                                 <label className="flex items-center gap-2">
-                                    <input type="checkbox" className="accent-slate-900" />
+                                    <input
+                                        type="checkbox"
+                                        className="accent-slate-900"
+                                        checked={remember}
+                                        onChange={(e) => setRemember(e.target.checked)}
+                                    />
                                     Se souvenir de moi
                                 </label>
-                                <button type="button" className="underline hover:text-slate-900">
+                                <button
+                                    type="button"
+                                    className="underline hover:text-slate-900"
+                                    onClick={() => {
+                                        onClose();
+                                        navigate('/forgot-password');
+                                    }}
+                                >
                                     Mot de passe oublie ?
                                 </button>
                             </div>

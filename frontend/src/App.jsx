@@ -19,6 +19,8 @@ import CategoryPage from './pages/CategoryPage';
 import Favorites from './pages/Favorites';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 import Contact from './pages/legal/Contact';
 import LegalPage from './pages/legal/LegalPage';
 
@@ -28,10 +30,10 @@ import AdminProducts from './pages/admin/AdminProducts';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminNewsletter from './pages/admin/AdminNewsletter';
+import { getStoredAuth } from './utils/authStorage';
 
 const ProtectedRoute = ({ children, isAdmin = false }) => {
-  const user = JSON.parse(localStorage.getItem('user'));
-  const token = localStorage.getItem('access_token');
+  const { user, token } = getStoredAuth();
   if (!token || !user) return <Navigate to="/" replace />;
   if (isAdmin && user.role !== 'admin') return <Navigate to="/" replace />;
   return children;
@@ -49,6 +51,8 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/shop/:category" element={<CategoryPage />} />
           <Route path="/shop/:category/:subcategory" element={<CategoryPage />} />
           <Route path="/product/:id" element={<ProductDetails />} />

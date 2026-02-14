@@ -3,19 +3,20 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
+import { setAuth } from '../../utils/authStorage';
 
 const Login = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({ email: '', password: '' });
+    const [remember, setRemember] = useState(true);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
             const res = await api.post('/api/auth/login', formData);
-            localStorage.setItem('user', JSON.stringify(res.data.user));
-            localStorage.setItem('access_token', res.data.access_token);
+            setAuth(res.data.user, res.data.access_token, remember);
             toast.success(`Bienvenue ${res.data.user.name} !`);
             navigate('/');
             window.location.reload();
@@ -106,12 +107,17 @@ const Login = () => {
 
                             <div className="flex items-center justify-between text-xs text-slate-500">
                                 <label className="flex items-center gap-2">
-                                    <input type="checkbox" className="accent-slate-900" />
+                                    <input
+                                        type="checkbox"
+                                        className="accent-slate-900"
+                                        checked={remember}
+                                        onChange={(e) => setRemember(e.target.checked)}
+                                    />
                                     Se souvenir de moi
                                 </label>
-                                <button type="button" className="underline hover:text-slate-900">
+                                <Link to="/forgot-password" className="underline hover:text-slate-900">
                                     Mot de passe oublie ?
-                                </button>
+                                </Link>
                             </div>
 
                             <button

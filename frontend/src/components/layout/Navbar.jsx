@@ -16,16 +16,14 @@ import {
 import { useCart } from '../../context/CartContext';
 import api from '../../api'; // Instance Axios Expert
 import { useFavorites } from '../../context/FavoritesContext';
+import { clearAuth, getStoredUser } from '../../utils/authStorage';
 
 const Navbar = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState(null);
-    const [user, setUser] = useState(() => {
-        const storedUser = localStorage.getItem('user');
-        return storedUser ? JSON.parse(storedUser) : null;
-    });
+    const [user, setUser] = useState(() => getStoredUser());
     const [bannerText, setBannerText] = useState("CHARGEMENT...");
 
     const navigate = useNavigate();
@@ -58,8 +56,7 @@ const Navbar = () => {
     }, []);
 
     const handleLogout = () => {
-        localStorage.removeItem('user');
-        localStorage.removeItem('access_token');
+        clearAuth();
         setUser(null);
         navigate('/');
         window.location.reload();

@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
+import { clearAuth, getStoredToken } from './authStorage';
 
 /**
  * INSTANCE API EXPERT (Axios)
- * Gère automatiquement le JWT et le format JSON
+ * Gere automatiquement le JWT et le format JSON
  */
 const apiInstance = axios.create({
     baseURL: API_BASE_URL,
@@ -14,20 +15,19 @@ const apiInstance = axios.create({
 
 // Intercepteur pour injecter le Token
 apiInstance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('access_token');
+    const token = getStoredToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
 
-// Intercepteur pour gérer la déconnexion sur erreur 401
+// Intercepteur pour gerer la deconnexion sur erreur 401
 apiInstance.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            localStorage.removeItem('user');
-            localStorage.removeItem('access_token');
+            clearAuth();
             if (window.location.pathname.startsWith('/admin')) {
                 window.location.href = '/';
             }
@@ -36,6 +36,6 @@ apiInstance.interceptors.response.use(
     }
 );
 
-// Rigueur : On exporte des deux manières pour éviter les erreurs d'import
+// Rigueur : On exporte des deux manieres pour eviter les erreurs d'import
 export const api = apiInstance;
 export default apiInstance;

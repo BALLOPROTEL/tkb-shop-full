@@ -16,6 +16,12 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import stripe
+import secrets
+import hashlib
+import smtplib
+import ssl
+import time
+from email.message import EmailMessage
 from dotenv import load_dotenv # Indispensable pour lire le fichier .env
 # --- 1. CONFIGURATION ET CHARGEMENT ---
 # Rigueur : Charger le .env avant toute chose
@@ -25,6 +31,8 @@ load_dotenv(dotenv_path=env_path)
 SECRET_KEY = os.getenv("JWT_SECRET", "TKB_PRIVATE_KEY_2026_SECURE_99_STAY_RIGOROUS")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 heures
+RESET_TOKEN_EXPIRE_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "30"))
+RESET_PASSWORD_DEBUG = os.getenv("RESET_PASSWORD_DEBUG", "0") == "1"
 
 # CORS (ne pas utiliser "*" avec credentials)
 cors_origins_env = os.getenv("CORS_ORIGINS")
@@ -40,8 +48,19 @@ try:
 except ValueError:
     STRIPE_AMOUNT_MULTIPLIER = 100
 
-# Configuration Stripe avec vÃ©rification
+# Configuration Stripe avec verification
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+# SMTP (Brevo)
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASS = os.getenv("SMTP_PASS")
+SMTP_FROM = os.getenv("SMTP_FROM") or SMTP_USER or "no-reply@localhost"
+
+RESET_RATE_LIMIT_WINDOW_SEC = int(os.getenv("RESET_RATE_LIMIT_WINDOW_SEC", "600"))
+RESET_RATE_LIMIT_MAX = int(os.getenv("RESET_RATE_LIMIT_MAX", "5"))
+_reset_rate_limit_store: dict[str, list[float]] = {}
 
 # PayPal
 PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID")
@@ -99,6 +118,13 @@ class UserUpdate(BaseModel):
 
 class UserLogin(BaseModel):
     email: EmailStr
+    password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
     password: str
 
 class Token(BaseModel):
@@ -271,6 +297,41 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+def _send_email(to_email: str, subject: str, html_body: str, text_body: str | None = None):
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
+        raise HTTPException(500, "SMTP non configure")
+
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(text_body or "Veuillez utiliser un client email compatible HTML.")
+    msg.add_alternative(html_body, subtype="html")
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+        server.ehlo()
+        server.starttls(context=context)
+        server.login(SMTP_USER, SMTP_PASS)
+        server.send_message(msg)
+
+def _rate_limit_allow(key: str) -> bool:
+    if RESET_RATE_LIMIT_MAX <= 0:
+        return True
+    now = time.time()
+    window = RESET_RATE_LIMIT_WINDOW_SEC
+    hits = _reset_rate_limit_store.get(key, [])
+    hits = [t for t in hits if now - t < window]
+    if len(hits) >= RESET_RATE_LIMIT_MAX:
+        _reset_rate_limit_store[key] = hits
+        return False
+    hits.append(now)
+    _reset_rate_limit_store[key] = hits
+    return True
+
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     # Rigueur : Nettoyage du prÃ©fixe Bearer si envoyÃ© manuellement
     token = token.replace("Bearer ", "")
@@ -366,6 +427,140 @@ def login(user: UserLogin):
         "token_type": "bearer", 
         "user": _sanitize_user(u)
     }
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(data: ForgotPasswordRequest, request: Request):
+    email = data.email.lower().strip()
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host or "unknown"
+    if not _rate_limit_allow(f"reset_ip:{client_ip}") or not _rate_limit_allow(f"reset_email:{email}"):
+        raise HTTPException(429, "Trop de demandes. Reessayez plus tard.")
+    user = db.users.find_one({"email": email})
+    # Toujours repondre OK pour eviter l'enumeration
+    if not user:
+        return {"success": True}
+
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_reset_token(token)
+    expires_at = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+
+    # On invalide les anciens tokens actifs
+    db.password_resets.delete_many({"userId": user["_id"], "usedAt": None})
+    db.password_resets.insert_one({
+        "userId": user["_id"],
+        "tokenHash": token_hash,
+        "expiresAt": expires_at,
+        "createdAt": datetime.utcnow(),
+        "usedAt": None,
+    })
+
+    reset_url = f"{os.getenv('CLIENT_URL', 'http://localhost:5173').rstrip('/')}/reset-password?token={token}"
+    subject = "Reinitialisation de votre mot de passe"
+    html_body = f"""
+    <div style="margin:0;padding:0;background:#f6f2ee;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f2ee;padding:30px 10px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid #e6e0d7;border-radius:20px;overflow:hidden;font-family:Georgia, 'Times New Roman', serif;">
+              <tr>
+                <td style="padding:28px 32px;background:linear-gradient(120deg,#0b0b0f,#1f2937);color:#ffffff;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="vertical-align:middle;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                          <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="24" height="24" rx="6" fill="#e9c46a"/>
+                            <path d="M6 16V8h2.4v5.6H12V16H6zm8.2 0V8H20v2h-3.4v6h-2.4z" fill="#0b0b0f"/>
+                          </svg>
+                          <div style="font-size:12px;letter-spacing:6px;text-transform:uppercase;">TKB SHOP</div>
+                        </div>
+                      </td>
+                      <td align="right" style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#e5e7eb;">Reinitialisation</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:28px 32px;color:#111827;">
+                  <p style="margin:0 0 14px 0;font-size:16px;line-height:1.6;">Vous avez demande une reinitialisation de votre mot de passe.</p>
+                  <p style="margin:0 0 20px 0;font-size:14px;line-height:1.6;color:#4b5563;">
+                    Cliquez sur le bouton ci-dessous pour continuer. Ce lien expire dans {RESET_TOKEN_EXPIRE_MINUTES} minutes.
+                  </p>
+                  <p style="margin:0 0 24px 0;">
+                    <a href="{reset_url}" style="display:inline-block;padding:12px 22px;background:#111827;color:#ffffff;text-decoration:none;text-transform:uppercase;letter-spacing:2px;font-size:12px;border-radius:10px;">
+                      Reinitialiser
+                    </a>
+                  </p>
+                  <p style="margin:0;font-size:12px;color:#6b7280;">Si vous n'etes pas a l'origine de cette demande, ignorez ce message.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 32px;background:#f8f6f2;color:#6b7280;font-size:11px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td style="vertical-align:top;">
+                        <div style="font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#111827;">TKB SHOP</div>
+                        <div style="margin-top:6px;">Abidjan, Cote d'Ivoire</div>
+                        <div>support@tkbshop.com</div>
+                        <div>+225 07 00 00 00 00</div>
+                      </td>
+                      <td align="right" style="vertical-align:top;">
+                        <div style="letter-spacing:2px;text-transform:uppercase;font-weight:700;color:#111827;">Nous suivre</div>
+                        <div style="margin-top:6px;">
+                          <a href="https://instagram.com" style="color:#111827;text-decoration:none;margin-left:8px;">Instagram</a>
+                          <a href="https://facebook.com" style="color:#111827;text-decoration:none;margin-left:8px;">Facebook</a>
+                          <a href="https://tiktok.com" style="color:#111827;text-decoration:none;margin-left:8px;">TikTok</a>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+    """
+    text_body = f"Reinitialisez votre mot de passe : {reset_url} (expire dans {RESET_TOKEN_EXPIRE_MINUTES} min)"
+
+    try:
+        _send_email(email, subject, html_body, text_body)
+    except Exception:
+        # On nettoie le token si l'envoi echoue
+        db.password_resets.delete_one({"tokenHash": token_hash})
+        raise
+
+    response = {"success": True, "expiresIn": RESET_TOKEN_EXPIRE_MINUTES}
+    if RESET_PASSWORD_DEBUG:
+        response["resetToken"] = token
+    return response
+
+@app.post("/api/auth/reset-password")
+def reset_password(data: ResetPasswordRequest):
+    token = (data.token or "").strip()
+    if not token:
+        raise HTTPException(400, "Token manquant")
+    if len(data.password) < 6:
+        raise HTTPException(400, "Mot de passe trop court")
+
+    token_hash = _hash_reset_token(token)
+    record = db.password_resets.find_one({
+        "tokenHash": token_hash,
+        "usedAt": None,
+        "expiresAt": {"$gt": datetime.utcnow()},
+    })
+    if not record:
+        raise HTTPException(400, "Token invalide ou expire")
+
+    db.users.update_one(
+        {"_id": record["userId"]},
+        {"$set": {"password": pwd_context.hash(data.password)}}
+    )
+    db.password_resets.update_one(
+        {"_id": record["_id"]},
+        {"$set": {"usedAt": datetime.utcnow()}}
+    )
+    return {"success": True}
 
 @app.get("/api/users/me")
 def get_me(current_user: dict = Depends(get_current_user)):

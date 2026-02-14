@@ -23,21 +23,43 @@ const MyOrders = () => {
     };
     fetchMyOrders();
   }, [navigate]);
+  const normalizeStatus = (status = '') =>
+    status
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .trim();
+
+  const formatStatus = (status = '') => {
+    const key = normalizeStatus(status);
+    if (key.startsWith('livr')) return 'Livre';
+    if (key.startsWith('annul')) return 'Annule';
+    if (key.startsWith('pay')) return 'Paye';
+    if (key.startsWith('en attente')) return 'En attente';
+    return status || 'En attente';
+  };
 
   const getStatusStyles = (status) => {
-    switch (status) {
-      case 'Livré': return 'text-emerald-500 bg-emerald-50 border-emerald-100';
-      case 'Annulé': return 'text-red-400 bg-red-50 border-red-50';
-      case 'Payé':
-      case 'Payé (Vérifié)': return 'text-pink-600 bg-pink-50 border-pink-100';
-      default: return 'text-amber-500 bg-amber-50 border-amber-100';
-    }
+    const key = normalizeStatus(status);
+    if (key.startsWith('livr')) return 'text-emerald-500 bg-emerald-50 border-emerald-100';
+    if (key.startsWith('annul')) return 'text-red-400 bg-red-50 border-red-50';
+    if (key.startsWith('pay')) return 'text-pink-600 bg-pink-50 border-pink-100';
+    return 'text-amber-500 bg-amber-50 border-amber-100';
+  };
+
+  const [openOrderId, setOpenOrderId] = useState(null);
+
+  const toggleOrder = (orderId) => {
+    setOpenOrderId((prev) => (prev === orderId ? null : orderId));
   };
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
       <Loader2 className="animate-spin text-pink-600" size={32} />
-      <p className="mt-4 text-[10px] uppercase tracking-[0.3em] text-pink-400 font-bold">Récupération de vos trésors...</p>
+      <p className="mt-4 text-[10px] uppercase tracking-[0.3em] text-pink-400 font-bold">Recuperation de vos tresors...</p>
     </div>
   );
 
@@ -47,7 +69,7 @@ const MyOrders = () => {
         <div className="text-center mb-16 space-y-4">
           <div className="flex items-center justify-center gap-2 text-pink-400">
             <Sparkles size={16} />
-            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.4em]">Historique Privé</span>
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.4em]">Historique Prive</span>
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif text-slate-900">Mes Commandes</h1>
           <div className="w-12 h-[1px] bg-pink-200 mx-auto"></div>
@@ -56,15 +78,27 @@ const MyOrders = () => {
         {orders.length === 0 ? (
           <div className="max-w-md mx-auto bg-pink-50/30 rounded-[40px] p-12 text-center border border-pink-50">
             <ShoppingBag size={48} strokeWidth={1} className="mx-auto text-pink-200 mb-6" />
-            <p className="text-slate-500 font-serif italic text-lg mb-8">Vous n'avez pas encore de pièce dans votre historique.</p>
+            <p className="text-slate-500 font-serif italic text-lg mb-8">Vous n'avez pas encore de piece dans votre historique.</p>
             <Link to="/" className="inline-block bg-slate-900 text-white px-10 py-4 text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-pink-600 transition-all">
-              Découvrir la collection
+              Decouvrir la collection
             </Link>
           </div>
         ) : (
           <div className="space-y-6">
             {orders.map((order) => (
-              <div key={order.id} className="group bg-white rounded-2xl p-6 md:p-8 border border-gray-100 hover:border-pink-200 transition-all duration-500 shadow-sm hover:shadow-xl hover:shadow-pink-50/50">
+              <div
+                key={order.id}
+                className="group bg-white rounded-2xl p-6 md:p-8 border border-gray-100 hover:border-pink-200 transition-all duration-500 shadow-sm hover:shadow-xl hover:shadow-pink-50/50 cursor-pointer"
+                onClick={() => toggleOrder(order.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleOrder(order.id);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                   <div className="flex items-center gap-6">
                     <div className="w-20 h-24 bg-pink-50 overflow-hidden rounded-lg shrink-0">
@@ -75,19 +109,63 @@ const MyOrders = () => {
                       <h3 className="font-serif text-xl text-slate-900">
                         {order.items?.length > 1 ? `${order.items?.[0]?.name} (+${order.items.length - 1} articles)` : order.items?.[0]?.name}
                       </h3>
-                      <p className="text-xs text-slate-400 font-light">Passée le {new Date(order.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                      <p className="text-xs text-slate-400 font-light">Passee le {new Date(order.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                     </div>
                   </div>
                   <div className="flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 gap-2">
                     <p className="text-xl font-light text-slate-900">{order.totalAmount.toLocaleString()} FCFA</p>
                     <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusStyles(order.status)}`}>
-                      {order.status}
+                      {formatStatus(order.status)}
                     </span>
                   </div>
                   <div className="hidden md:block pl-4">
-                    <ChevronRight size={20} className="text-slate-300 group-hover:text-pink-600 transition-colors" />
+                    <ChevronRight
+                      size={20}
+                      className={`text-slate-300 group-hover:text-pink-600 transition-all ${openOrderId === order.id ? 'rotate-90 text-pink-600' : ''}`}
+                    />
                   </div>
+
                 </div>
+                {openOrderId === order.id && (
+                  <div className="mt-6 border-t border-pink-50 pt-6 grid gap-6 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Livraison</p>
+                      <p className="text-sm text-slate-700">{order.shippingAddress || 'Adresse non fournie'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Contact</p>
+                      <p className="text-sm text-slate-700">{order.phone || 'Telephone non fourni'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Paiement</p>
+                      <p className="text-sm text-slate-700">{order.paymentMethod || 'Non renseigne'}</p>
+                      {order.paymentId && <p className="text-xs text-slate-400">ID: {order.paymentId}</p>}
+                    </div>
+                    <div className="md:col-span-3 space-y-3">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Articles</p>
+                      <div className="divide-y divide-pink-50">
+                        {(order.items || []).map((item, idx) => (
+                          <div key={`${order.id}-${idx}`} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-16 h-20 bg-pink-50 overflow-hidden rounded-lg shrink-0">
+                                <img src={item.image || "https://via.placeholder.com/150"} alt={item.name || 'Produit'} className="w-full h-full object-cover" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{item.name || 'Article'}</p>
+                                <p className="text-xs text-slate-400">
+                                  Qt: {item.quantity || 1}
+                                  {item.size ? ` - Taille ${item.size}` : ''}
+                                  {item.color ? ` - Couleur ${item.color}` : ''}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-sm font-medium text-slate-900">{Number(item.price || 0).toLocaleString()} FCFA</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

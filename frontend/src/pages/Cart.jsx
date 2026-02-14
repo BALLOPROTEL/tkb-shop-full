@@ -2,12 +2,13 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { getStoredUser } from '../utils/authStorage';
 import { toast } from 'react-hot-toast';
 
 const Cart = () => {
     const { cart, removeFromCart, updateQuantity, cartTotal } = useCart();
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = getStoredUser();
 
     const shippingThreshold = 50000;
     const shippingCost = cartTotal >= shippingThreshold ? 0 : 5000;

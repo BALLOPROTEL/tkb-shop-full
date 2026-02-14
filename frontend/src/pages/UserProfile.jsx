@@ -4,15 +4,12 @@ import { LogOut, Shield, Heart, ArrowUpDown, Pencil, Save, Phone, Globe } from '
 import { toast } from 'react-hot-toast';
 import { useFavorites } from '../context/FavoritesContext';
 import { getDisplayCategory, getGroupLabel, isNewProduct, isPromo } from '../utils/product';
+import { clearAuth, getStoredUser, updateStoredUser } from '../utils/authStorage';
 import api from '../api';
 import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
 
 const UserProfile = () => {
     const navigate = useNavigate();
-    const getStoredUser = () => {
-        const storedUser = localStorage.getItem('user');
-        return storedUser ? JSON.parse(storedUser) : null;
-    };
     const [user, setUser] = useState(getStoredUser);
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState('profile');
@@ -42,7 +39,7 @@ const UserProfile = () => {
                 const res = await api.get('/api/users/me');
                 const fresh = res.data;
                 const merged = { ...user, ...fresh };
-                localStorage.setItem('user', JSON.stringify(merged));
+                updateStoredUser(merged);
                 setUser(merged);
                 setFormData({
                     firstName: merged.firstName || '',
@@ -113,7 +110,7 @@ const UserProfile = () => {
             };
             const res = await api.put('/api/users/me', payload);
             const updatedUser = { ...user, ...res.data };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
+            updateStoredUser(updatedUser);
             setUser(updatedUser);
             setIsEditing(false);
             toast.success('Profil mis à jour avec succès !');
@@ -124,8 +121,7 @@ const UserProfile = () => {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('user');
-        localStorage.removeItem('access_token');
+        clearAuth();
         toast.success('Session clôturée');
         navigate('/');
         window.location.reload();

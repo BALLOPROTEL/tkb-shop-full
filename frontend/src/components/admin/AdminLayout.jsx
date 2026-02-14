@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Package, ShoppingBag, Users, LogOut, Menu, ArrowLeft, X, Mail } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { clearAuth, getStoredUser } from '../../utils/authStorage';
 
 export default function AdminLayout({ children }) {
     const location = useLocation();
@@ -10,7 +11,7 @@ export default function AdminLayout({ children }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = getStoredUser();
         if (!user || user.role !== 'admin') {
             toast.error("Accès restreint aux administrateurs");
             navigate('/');
@@ -18,8 +19,7 @@ export default function AdminLayout({ children }) {
     }, [navigate]);
 
     const handleLogout = () => {
-        localStorage.removeItem('user');
-        localStorage.removeItem('access_token');
+        clearAuth();
         toast.success("Déconnexion réussie");
         navigate('/');
         window.location.reload();
