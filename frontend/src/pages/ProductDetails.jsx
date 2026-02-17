@@ -125,8 +125,8 @@ const ProductDetails = () => {
                                 </div>
                             )}
 
-                            <div className="pt-8 border-t border-pink-50 flex flex-col sm:flex-row gap-4">
-                                <div className="flex items-center bg-pink-50/50 border border-pink-100 h-12 w-32 justify-between px-4">
+                            <div className="pt-8 border-t border-pink-50 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                                <div className="flex items-center bg-pink-50/50 border border-pink-100 h-12 w-full sm:w-32 justify-between px-4 rounded-full">
                                     <button onClick={() => setQuantity(q => Math.max(1, q - 1))}><Minus size={16} /></button>
                                     <span className="font-bold">{quantity}</span>
                                     <button onClick={() => setQuantity(q => q + 1)}><Plus size={16} /></button>
@@ -134,7 +134,7 @@ const ProductDetails = () => {
                                 <button onClick={() => {
                                     if (hasSizes && !selectedSize) return toast.error("Taille requise");
                                     addToCart(product, quantity, selectedSize, selectedColor);
-                                }} className="flex-1 bg-slate-900 text-white h-12 text-[11px] font-bold uppercase tracking-[0.3em] hover:bg-pink-600 transition-all flex items-center justify-center gap-3">
+                                }} className="w-full sm:flex-1 bg-slate-900 text-white h-14 sm:h-12 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.18em] sm:tracking-[0.3em] hover:bg-pink-600 transition-all flex items-center justify-center gap-3 rounded-full shadow-lg shadow-slate-900/10">
                                     <ShoppingBag size={16} /> Ajouter au Panier
                                 </button>
                             </div>
