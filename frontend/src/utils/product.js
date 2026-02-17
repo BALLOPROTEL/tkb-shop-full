@@ -105,6 +105,15 @@ export const isPromo = (product = {}) => {
     return price < oldPrice;
 };
 
+export const getDiscountPercent = (product = {}) => {
+    const price = Number(product.price);
+    const oldPrice = Number(product.oldPrice);
+    if (!Number.isFinite(price) || !Number.isFinite(oldPrice)) return null;
+    if (oldPrice <= 0 || price >= oldPrice) return null;
+    const percent = Math.round(((oldPrice - price) / oldPrice) * 100);
+    return percent > 0 ? percent : null;
+};
+
 export const isNewProduct = (product = {}, days = 14) => {
     if (!product.createdAt) return false;
     const date = new Date(product.createdAt);

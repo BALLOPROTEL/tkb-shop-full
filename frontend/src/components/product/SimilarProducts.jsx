@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
-import { getGroupLabel, getDisplayCategory, isNewProduct, isPromo } from '../../utils/product';
+import { getGroupLabel, isNewProduct, isPromo, getDiscountPercent } from '../../utils/product';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay } from 'swiper/modules';
 import 'swiper/css';
@@ -45,19 +45,23 @@ const SimilarProducts = ({ currentProductId, currentGroup }) => {
                 breakpoints={{ 640: { slidesPerView: 3 }, 1024: { slidesPerView: 4 } }}
                 className="pb-10"
             >
-                {similar.map((product) => (
+                {similar.map((product) => {
+                    const isNew = isNewProduct(product);
+                    const promo = isPromo(product);
+                    const discount = getDiscountPercent(product);
+                    return (
                     <SwiperSlide key={product.id}>
                         <Link to={`/product/${product.id}`} className="group block">
                             <div className="relative aspect-[3/4] bg-[#fff0f5] rounded-xl overflow-hidden mb-4 shadow-sm">
                                 <div className="absolute top-3 left-3 z-20 flex flex-col gap-1">
-                                    {isNewProduct(product) && <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Nouveau</span>}
-                                    {isPromo(product) && <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Promo</span>}
-                                    <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-900">
-                                        {getGroupLabel(product)}
-                                    </span>
-                                    {product.subcategory && (
-                                        <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-pink-600">
-                                            {product.subcategory}
+                                    {isNew && (
+                                        <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                            New
+                                        </span>
+                                    )}
+                                    {discount && (
+                                        <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">
+                                            -{discount}%
                                         </span>
                                     )}
                                 </div>
@@ -75,13 +79,16 @@ const SimilarProducts = ({ currentProductId, currentGroup }) => {
                                 />
                             </div>
                             <div className="text-center">
-                                <p className="text-[9px] text-pink-400 font-bold uppercase tracking-widest">{getDisplayCategory(product)}</p>
                                 <h3 className="font-serif text-sm text-slate-900 truncate">{product.name}</h3>
-                                <p className="text-xs font-bold text-slate-900 mt-1">{product.price.toLocaleString()} F</p>
+                                <div className="flex items-center justify-center gap-2 mt-1">
+                                    <p className="text-xs font-bold text-slate-900">{product.price.toLocaleString()} F</p>
+                                    {promo && <p className="text-[10px] text-slate-300 line-through">{product.oldPrice.toLocaleString()} F</p>}
+                                </div>
                             </div>
                         </Link>
                     </SwiperSlide>
-                ))}
+                    );
+                })}
             </Swiper>
         </section>
     );

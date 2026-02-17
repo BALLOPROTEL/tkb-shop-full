@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api';
-import { slugify, normalizeCategorySlug, getGroupLabel, getGroupLabelFromSlug, getSubcategoryLabelFromSlug, getDisplayCategory, isNewProduct, isPromo } from '../utils/product';
+import { slugify, normalizeCategorySlug, getGroupLabel, getGroupLabelFromSlug, getSubcategoryLabelFromSlug, isNewProduct, isPromo, getDiscountPercent } from '../utils/product';
 import { Loader2, Sparkles, Heart, ArrowUpDown } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
@@ -246,18 +246,21 @@ const CategoryPage = () => {
                                 const displayImages = product.images?.length > 0 ? product.images : [product.image];
                                 const promo = isPromo(product);
                                 const isNew = isNewProduct(product);
+                                const discount = getDiscountPercent(product);
+                                const rawDescription = (product.description || '').trim();
+                                const descriptionText = rawDescription.length > 90 ? `${rawDescription.slice(0, 89)}…` : rawDescription;
                                 return (
                                     <div key={product.id} className="group product-card-shell">
                                         <div className="relative aspect-[3/4] overflow-hidden bg-[#fff0f5] rounded-sm mb-6 shadow-sm group-hover:shadow-xl transition-shadow duration-500">
                                             <div className="absolute top-3 left-3 z-20 flex flex-col gap-1">
-                                                {isNew && <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Nouveau</span>}
-                                                {promo && <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Promo</span>}
-                                                <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-900">
-                                                    {getGroupLabel(product)}
-                                                </span>
-                                                {product.subcategory && (
-                                                    <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-pink-600">
-                                                        {product.subcategory}
+                                                {isNew && (
+                                                    <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                                        New
+                                                    </span>
+                                                )}
+                                                {discount && (
+                                                    <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">
+                                                        -{discount}%
                                                     </span>
                                                 )}
                                             </div>
@@ -299,10 +302,12 @@ const CategoryPage = () => {
                                             </Link>
                                         </div>
                                         <div className="space-y-2 text-center">
-                                            <p className="text-[9px] text-pink-400 font-bold uppercase tracking-[0.2em]">{getDisplayCategory(product)}</p>
                                             <Link to={`/product/${product.id}`} className="inline-block">
                                                 <h3 className="font-serif text-xl text-slate-900 group-hover:text-pink-600 transition-colors">{product.name}</h3>
                                             </Link>
+                                            {descriptionText && (
+                                                <p className="text-xs text-slate-500 leading-relaxed">{descriptionText}</p>
+                                            )}
                                             <div className="flex items-center justify-center gap-2">
                                                 <p className="text-sm font-medium text-slate-900">{product.price.toLocaleString()} FCFA</p>
                                                 {promo && <p className="text-xs text-slate-300 line-through">{product.oldPrice.toLocaleString()} FCFA</p>}

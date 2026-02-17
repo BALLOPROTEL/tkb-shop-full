@@ -54,6 +54,7 @@ const ProductDetails = () => {
     const hasSizes = sizes.length > 0;
     const displayCategory = getDisplayCategory(product);
     const sizeLabel = isShoes ? 'Pointure' : 'Taille';
+    const description = (product.description || '').trim();
 
     return (
         <div className="bg-white min-h-screen pt-32">
@@ -105,6 +106,12 @@ const ProductDetails = () => {
                         </div>
 
                         <div className="space-y-8">
+                            {description && (
+                                <div className="space-y-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-widest">Description</span>
+                                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{description}</p>
+                                </div>
+                            )}
                             {product.colors?.length > 0 && (
                                 <div className="space-y-3">
                                     <span className="text-[11px] font-bold uppercase tracking-widest">Nuance</span>

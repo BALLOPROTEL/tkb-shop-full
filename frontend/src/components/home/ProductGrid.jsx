@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, ShoppingBag, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import api from '../../api'; // Instance Expert
-import { getGroupLabel, getDisplayCategory, isNewProduct, isPromo } from '../../utils/product';
+import { getGroupLabel, isNewProduct, isPromo, getDiscountPercent } from '../../utils/product';
 import { toast } from 'react-hot-toast';
 import { useFavorites } from '../../context/FavoritesContext';
 
@@ -60,18 +60,24 @@ export default function ProductGrid() {
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 sm:gap-10">
-                    {currentItems.map(product => (
+                    {currentItems.map(product => {
+                        const rawDescription = (product.description || '').trim();
+                        const descriptionText = rawDescription.length > 90 ? `${rawDescription.slice(0, 89)}…` : rawDescription;
+                        const isNew = isNewProduct(product);
+                        const promo = isPromo(product);
+                        const discount = getDiscountPercent(product);
+                        return (
                         <div key={product.id} className="group flex flex-col gap-4">
                             <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-slate-50 shadow-sm">
                                 <div className="absolute top-3 left-3 z-20 flex flex-col gap-1">
-                                    {isNewProduct(product) && <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Nouveau</span>}
-                                    {isPromo(product) && <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Promo</span>}
-                                    <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-900">
-                                        {getGroupLabel(product)}
-                                    </span>
-                                    {product.subcategory && (
-                                        <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-pink-600">
-                                            {product.subcategory}
+                                    {isNew && (
+                                        <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                            New
+                                        </span>
+                                    )}
+                                    {discount && (
+                                        <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">
+                                            -{discount}%
                                         </span>
                                     )}
                                 </div>
@@ -91,14 +97,17 @@ export default function ProductGrid() {
                             </div>
                             <div className="text-center">
                                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight truncate">{product.name}</h3>
-                                <p className="text-[9px] text-pink-400 font-bold uppercase tracking-[0.2em]">{getDisplayCategory(product)}</p>
+                                {descriptionText && (
+                                    <p className="text-xs text-slate-500 leading-relaxed mt-2">{descriptionText}</p>
+                                )}
                                 <div className="flex items-center justify-center gap-2">
                                     <p className="text-pink-600 font-serif font-bold mt-1">{product.price.toLocaleString()} F CFA</p>
-                                    {isPromo(product) && <p className="text-xs text-slate-300 line-through mt-1">{product.oldPrice.toLocaleString()} F CFA</p>}
+                                    {promo && <p className="text-xs text-slate-300 line-through mt-1">{product.oldPrice.toLocaleString()} F CFA</p>}
                                 </div>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {totalPages > 1 && (

@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api'; // Import instance Axios corrige
-import { getDisplayCategory, getGroupLabel, isNewProduct, isPromo } from '../utils/product';
+import { isNewProduct, isPromo, getDiscountPercent } from '../utils/product';
 import Hero from '../components/home/Hero';
 import { Loader2, Sparkles, Heart } from 'lucide-react';
 import { useFavorites } from '../context/FavoritesContext';
@@ -108,18 +108,23 @@ const Home = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10 sm:gap-x-8 sm:gap-y-16">
                         {pageItems.map((product) => {
                             const displayImages = product.images?.length > 0 ? product.images : [product.image];
+                            const rawDescription = (product.description || '').trim();
+                            const descriptionText = rawDescription.length > 90 ? `${rawDescription.slice(0, 89)}…` : rawDescription;
+                            const isNew = isNewProduct(product);
+                            const promo = isPromo(product);
+                            const discount = getDiscountPercent(product);
                             return (
                                 <div key={product.id} className="group product-card-shell">
                                     <div className="relative aspect-[3/4] overflow-hidden bg-[#fff0f5] rounded-sm mb-6 shadow-sm group-hover:shadow-xl transition-shadow duration-500">
                                         <div className="absolute top-3 left-3 z-20 flex flex-col gap-1">
-                                            {isNewProduct(product) && <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Nouveau</span>}
-                                            {isPromo(product) && <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">Promo</span>}
-                                            <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-900">
-                                                {getGroupLabel(product)}
-                                            </span>
-                                            {product.subcategory && (
-                                                <span className="bg-white/90 backdrop-blur px-2 py-1 text-[9px] font-black uppercase tracking-widest text-pink-600">
-                                                    {product.subcategory}
+                                            {isNew && (
+                                                <span className="bg-pink-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                                    New
+                                                </span>
+                                            )}
+                                            {discount && (
+                                                <span className="bg-red-600 text-white px-2 py-1 text-[9px] font-black uppercase tracking-widest">
+                                                    -{discount}%
                                                 </span>
                                             )}
                                         </div>
@@ -161,13 +166,15 @@ const Home = () => {
                                         </Link>
                                     </div>
                                     <div className="space-y-2 text-center">
-                                        <p className="text-[9px] text-pink-400 font-bold uppercase tracking-[0.2em]">{getDisplayCategory(product)}</p>
                                         <Link to={`/product/${product.id}`} className="inline-block">
                                             <h3 className="font-serif text-xl text-slate-900 group-hover:text-pink-600 transition-colors">{product.name}</h3>
                                         </Link>
+                                        {descriptionText && (
+                                            <p className="text-xs text-slate-500 leading-relaxed">{descriptionText}</p>
+                                        )}
                                         <div className="flex items-center justify-center gap-2">
                                             <p className="text-sm font-medium text-slate-900">{product.price.toLocaleString()} FCFA</p>
-                                            {isPromo(product) && <p className="text-xs text-slate-300 line-through">{product.oldPrice.toLocaleString()} FCFA</p>}
+                                            {promo && <p className="text-xs text-slate-300 line-through">{product.oldPrice.toLocaleString()} FCFA</p>}
                                         </div>
                                     </div>
                                 </div>

@@ -7,6 +7,8 @@ const AdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -26,9 +28,50 @@ const AdminUsers = () => {
     } catch (error) { console.error(error); toast.error("Échec"); }
   };
 
+
+  const handleInvite = async () => {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    setInviting(true);
+    try {
+      const res = await api.post('/api/admin/invites', { email });
+      toast.success(`Invitation envoyee (valide ${res.data?.expiresIn || 5} min)`);
+      setInviteEmail('');
+    } catch (error) {
+      const msg = error.response?.data?.detail || "Erreur d'invitation";
+      toast.error(msg);
+    } finally {
+      setInviting(false);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 bg-slate-950 min-h-screen text-slate-200">
       <h1 className="text-3xl font-bold flex items-center gap-3 mb-8"><Users className="text-blue-500" /> Base Clients</h1>
+
+      <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-6">
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-bold">Ajouter un administrateur</p>
+        <div className="mt-3 flex flex-col sm:flex-row gap-3">
+          <input
+            type="email"
+            placeholder="Email du futur admin"
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleInvite}
+            disabled={inviting || !inviteEmail.trim()}
+            className="px-6 py-3 rounded-xl bg-blue-600 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+          >
+            {inviting ? 'Envoi...' : 'Ajouter'}
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          L'invitation est valable 5 minutes et ne fonctionne que pour un compte deja inscrit.
+        </p>
+      </div>
       <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 mb-6 flex items-center gap-3">
         <Search className="text-slate-400" size={20} />
         <input type="text" placeholder="Email ou Nom..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-transparent outline-none" />

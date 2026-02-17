@@ -21,6 +21,7 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import AdminInvite from './pages/auth/AdminInvite';
 import Contact from './pages/legal/Contact';
 import LegalPage from './pages/legal/LegalPage';
 
@@ -53,6 +54,7 @@ const AppContent = () => {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/admin-invite" element={<AdminInvite />} />
           <Route path="/shop/:category" element={<CategoryPage />} />
           <Route path="/shop/:category/:subcategory" element={<CategoryPage />} />
           <Route path="/product/:id" element={<ProductDetails />} />
