@@ -10,7 +10,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
-app = FastAPI(title="TKB Shop Orders Service", version="0.2.0")
+app = FastAPI(title="TKB Shop Orders Service", version="0.3.0")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
@@ -18,6 +18,7 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 PAYMENTS_SERVICE_URL = os.getenv("PAYMENTS_SERVICE_URL", "http://payments:8000").rstrip("/")
+CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
 
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database(MONGO_DB_NAME)
@@ -119,81 +120,50 @@ def _coerce_items(items: list) -> list[dict]:
     return normalized
 
 
-def _get_products_map(item_list: list[dict]) -> dict:
-    ids = [ObjectId(item["product"]) for item in item_list]
-    products = {
-        str(product["_id"]): product
-        for product in db.products.find({"_id": {"$in": ids}})
-    }
-    if len(products) != len(ids):
-        raise HTTPException(400, "Produit introuvable")
-    return products
-
-
-def _check_stock(item_list: list[dict], products: dict) -> None:
-    for item in item_list:
-        product = products[item["product"]]
-        stock = int(product.get("stock", 0) or 0)
-        if stock < item["quantity"]:
-            raise HTTPException(409, f"Stock insuffisant pour {product.get('name', 'Produit')}")
-
-
-def _build_priced_items(item_list: list[dict], products: dict) -> tuple[list[dict], float]:
-    normalized = []
-    total = 0.0
-    for item in item_list:
-        product = products[item["product"]]
-        price = float(product.get("price", 0) or 0)
-        if price <= 0:
-            raise HTTPException(400, "Prix invalide")
-
-        image = product.get("image") or (product.get("images") or [""])[0] or ""
-        normalized.append(
-            {
-                "product": item["product"],
-                "name": product.get("name") or "",
-                "quantity": item["quantity"],
-                "price": price,
-                "image": image,
-                "size": item.get("size", "Unique"),
-            }
-        )
-        total += price * item["quantity"]
-    return normalized, total
-
-
-def _decrement_stock(item_list: list[dict], strict: bool = False) -> None:
-    for item in item_list:
-        result = db.products.update_one(
-            {
-                "_id": ObjectId(item["product"]),
-                "stock": {"$gte": item["quantity"]},
-            },
-            {"$inc": {"stock": -item["quantity"]}},
-        )
-        if strict and result.modified_count == 0:
-            raise HTTPException(409, "Stock insuffisant")
-
-
-def _verify_paypal_order(order_id: str, expected_total: float) -> None:
+def _internal_post(url: str, payload: dict) -> dict:
     if not INTERNAL_SERVICE_TOKEN:
         raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
     try:
         response = httpx.post(
-            f"{PAYMENTS_SERVICE_URL}/internal/paypal/verify",
-            json={"orderId": order_id, "expectedTotal": expected_total},
+            url,
+            json=payload,
             headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
             timeout=20.0,
         )
     except httpx.HTTPError as exc:
-        raise HTTPException(502, f"Payments service indisponible: {exc}")
+        raise HTTPException(502, f"Service interne indisponible: {exc}")
 
     if response.status_code >= 400:
         try:
             detail = response.json().get("detail")
         except ValueError:
             detail = response.text
-        raise HTTPException(response.status_code, detail or "Paiement PayPal invalide")
+        raise HTTPException(response.status_code, detail or "Erreur service interne")
+    return response.json()
+
+
+def _catalog_quote(items: list[dict]) -> dict:
+    return _internal_post(
+        f"{CATALOG_SERVICE_URL}/internal/catalog/quote",
+        {"items": items},
+    )
+
+
+def _catalog_commit_stock(items: list[dict], key: str) -> dict:
+    return _internal_post(
+        f"{CATALOG_SERVICE_URL}/internal/catalog/stock/commit",
+        {
+            "items": items,
+            "idempotencyKey": key,
+        },
+    )
+
+
+def _verify_paypal_order(order_id: str, expected_total: float) -> None:
+    _internal_post(
+        f"{PAYMENTS_SERVICE_URL}/internal/paypal/verify",
+        {"orderId": order_id, "expectedTotal": expected_total},
+    )
 
 
 @app.get("/_health")
@@ -241,9 +211,9 @@ def get_admin_orders(_admin: dict = Depends(get_current_admin)):
 @app.post("/api/orders")
 def create_order(order: Order, user: dict = Depends(get_current_user)):
     items = _coerce_items(order.items)
-    products = _get_products_map(items)
-    _check_stock(items, products)
-    normalized_items, total = _build_priced_items(items, products)
+    quote = _catalog_quote(items)
+    normalized_items = quote["items"]
+    total = quote["totalAmount"]
 
     document = order.model_dump()
     document["items"] = normalized_items
@@ -258,8 +228,8 @@ def create_order(order: Order, user: dict = Depends(get_current_user)):
         if not payment_id:
             raise HTTPException(400, "paymentId manquant")
         _verify_paypal_order(payment_id, total)
+        _catalog_commit_stock(normalized_items, f"paypal:{payment_id}")
         document["status"] = "Payé"
-        _decrement_stock(normalized_items, strict=True)
     else:
         document["status"] = "En attente"
 
@@ -275,10 +245,7 @@ def create_order(order: Order, user: dict = Depends(get_current_user)):
 def quote_order(data: dict, _user: dict = Depends(get_current_user)):
     items = data.get("items", []) if isinstance(data, dict) else []
     normalized = _coerce_items(items)
-    products = _get_products_map(normalized)
-    _check_stock(normalized, products)
-    priced_items, total = _build_priced_items(normalized, products)
-    return {"totalAmount": total, "items": priced_items}
+    return _catalog_quote(normalized)
 
 
 @app.put("/api/orders/{order_id}/status")
@@ -320,6 +287,11 @@ def payment_completed(
     if order.get("status") in paid_statuses:
         return {"success": True, "alreadyProcessed": True}
 
+    stock_result = _catalog_commit_stock(
+        order.get("items", []),
+        f"order-payment:{order_id}",
+    )
+
     result = db.orders.update_one(
         {
             "_id": ObjectId(order_id),
@@ -335,5 +307,7 @@ def payment_completed(
     if result.modified_count == 0:
         return {"success": True, "alreadyProcessed": True}
 
-    _decrement_stock(order.get("items", []), strict=False)
-    return {"success": True, "alreadyProcessed": False}
+    return {
+        "success": True,
+        "alreadyProcessed": bool(stock_result.get("alreadyProcessed")),
+    }
