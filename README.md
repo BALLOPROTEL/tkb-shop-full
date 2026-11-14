@@ -2,39 +2,58 @@
 
 TKB Shop is an e-commerce application built with React/Vite and FastAPI/MongoDB.
 
-## Current architecture
+## Microservices runtime
 
-The repository is being migrated from a FastAPI monolith to microservices using a **strangler pattern**. The public frontend contract stays stable under `/api/*`.
+The frontend keeps a stable `/api/*` contract and talks only to the API Gateway.
 
-Current route ownership:
+Route ownership:
 
-- `gateway`: single frontend entry point.
-- `catalog`: owns `/api/products*`.
-- `auth`: owns `/api/auth/*`, `/api/users/me` and `/api/admin/invites*`.
-- `legacy-api`: temporarily owns routes not extracted yet.
-- planned next: `orders`, `payments`, `notifications`.
+- `gateway`: public API entry point.
+- `catalog`: `/api/products*`.
+- `auth`: `/api/auth/*`, `/api/users/me`, `/api/admin/invites*`, `/api/admin/users*`.
+- `orders`: `/api/orders*`, `/api/admin/orders`.
+- `payments`: `/api/payments*`, Stripe and PayPal integrations.
+- `notifications`: internal transactional email delivery.
+- `backoffice`: settings, newsletter and admin aggregate stats.
+
+Unknown API routes return 404. The legacy FastAPI application is no longer part of the microservices runtime.
 
 ## Run locally
 
 1. Copy `.env.microservices.example` to `.env`.
-2. Set a strong `JWT_SECRET`.
+2. Set strong values for `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN`.
 3. Run:
 
 ```bash
 docker compose -f docker-compose.microservices.yml up --build
 ```
 
-Gateway: http://localhost:8000  
-Catalog health: http://localhost:8001/_health  
-Auth health: http://localhost:8002/_health  
-Legacy docs: http://localhost:8005/docs
+Health endpoints:
 
-For the frontend:
+- Gateway: http://localhost:8000/_health
+- Catalog: http://localhost:8001/_health
+- Auth: http://localhost:8002/_health
+- Orders: http://localhost:8003/_health
+- Payments: http://localhost:8004/_health
+- Notifications: http://localhost:8006/_health
+- Backoffice: http://localhost:8007/_health
+
+Frontend:
 
 ```bash
 cd frontend
 npm ci
 VITE_API_BASE_URL=http://localhost:8000 npm run dev
+```
+
+## Certification
+
+The CI includes isolated service tests plus a full Docker Compose certification that exercises the system through the API Gateway.
+
+```bash
+JWT_SECRET=local-secret \
+INTERNAL_SERVICE_TOKEN=local-internal-secret \
+bash scripts/certify_microservices.sh
 ```
 
 ## Migration status
@@ -46,7 +65,10 @@ VITE_API_BASE_URL=http://localhost:8000 npm run dev
 | Auth / Users | Extracted |
 | Orders | Extracted |
 | Payments | Extracted |
-| Notifications / email | Extracted |
-| Legacy monolith | Removed from runtime |
+| Notifications | Extracted |
+| Backoffice | Extracted |
+| Legacy runtime | Removed |
+| Database ownership split | In progress |
+| Observability / resilience | Planned |
 
 See `docs/architecture/microservices-migration.md`.
