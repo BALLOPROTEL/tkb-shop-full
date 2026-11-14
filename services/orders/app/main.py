@@ -1,31 +1,23 @@
-import base64
-import json
 import os
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import datetime
 from typing import List, Optional
 
+import httpx
 from bson import ObjectId
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
-app = FastAPI(title="TKB Shop Orders Service", version="0.1.0")
+app = FastAPI(title="TKB Shop Orders Service", version="0.2.0")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
-
-PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID")
-PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET")
-PAYPAL_ENV = os.getenv("PAYPAL_ENV", "sandbox").lower()
-PAYPAL_CURRENCY = os.getenv("PAYPAL_CURRENCY", "EUR")
-PAYPAL_FX_RATE = float(os.getenv("PAYPAL_FX_RATE", "655"))
+INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
+PAYMENTS_SERVICE_URL = os.getenv("PAYMENTS_SERVICE_URL", "http://payments:8000").rstrip("/")
 
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database(MONGO_DB_NAME)
@@ -52,10 +44,21 @@ class Order(BaseModel):
     createdAt: datetime = Field(default_factory=datetime.now)
 
 
+class PaymentCompletedRequest(BaseModel):
+    paymentId: Optional[str] = None
+
+
 def _require_jwt_secret() -> str:
     if not JWT_SECRET:
         raise HTTPException(500, "JWT_SECRET non configure")
     return JWT_SECRET
+
+
+def _require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:
+    if not INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
+    if x_internal_token != INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(401, "Service interne non autorise")
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
@@ -172,72 +175,25 @@ def _decrement_stock(item_list: list[dict], strict: bool = False) -> None:
             raise HTTPException(409, "Stock insuffisant")
 
 
-def _paypal_base_url() -> str:
-    if PAYPAL_ENV == "live":
-        return "https://api-m.paypal.com"
-    return "https://api-m.sandbox.paypal.com"
-
-
-def _paypal_access_token() -> str:
-    if not PAYPAL_CLIENT_ID or not PAYPAL_CLIENT_SECRET:
-        raise HTTPException(500, "PayPal non configure")
-
-    auth = base64.b64encode(
-        f"{PAYPAL_CLIENT_ID}:{PAYPAL_CLIENT_SECRET}".encode()
-    ).decode()
-    data = urllib.parse.urlencode({"grant_type": "client_credentials"}).encode()
-    request = urllib.request.Request(
-        f"{_paypal_base_url()}/v1/oauth2/token",
-        data=data,
-        method="POST",
-    )
-    request.add_header("Authorization", f"Basic {auth}")
-    request.add_header("Content-Type", "application/x-www-form-urlencoded")
-
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            payload = json.loads(response.read().decode())
-    except urllib.error.HTTPError as exc:
-        raise HTTPException(502, f"PayPal token error: {exc.code}")
-
-    token = payload.get("access_token")
-    if not token:
-        raise HTTPException(502, "PayPal token invalide")
-    return token
-
-
-def _paypal_fetch_order(order_id: str) -> dict:
-    request = urllib.request.Request(
-        f"{_paypal_base_url()}/v2/checkout/orders/{order_id}"
-    )
-    request.add_header("Authorization", f"Bearer {_paypal_access_token()}")
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return json.loads(response.read().decode())
-    except urllib.error.HTTPError as exc:
-        raise HTTPException(502, f"PayPal order error: {exc.code}")
-
-
 def _verify_paypal_order(order_id: str, expected_total: float) -> None:
-    order = _paypal_fetch_order(order_id)
-    if order.get("status") not in ("COMPLETED", "APPROVED"):
-        raise HTTPException(400, "Paiement PayPal non confirme")
-
-    units = order.get("purchase_units") or []
-    if not units:
-        raise HTTPException(400, "PayPal order invalide")
-
-    amount = units[0].get("amount", {})
+    if not INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
     try:
-        paid_value = float(amount.get("value", 0))
-    except (TypeError, ValueError):
-        raise HTTPException(400, "Montant PayPal invalide")
+        response = httpx.post(
+            f"{PAYMENTS_SERVICE_URL}/internal/paypal/verify",
+            json={"orderId": order_id, "expectedTotal": expected_total},
+            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            timeout=20.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"Payments service indisponible: {exc}")
 
-    expected = round(expected_total / PAYPAL_FX_RATE, 2)
-    if amount.get("currency_code") and amount.get("currency_code") != PAYPAL_CURRENCY:
-        raise HTTPException(400, "Devise PayPal invalide")
-    if abs(paid_value - expected) > 0.01:
-        raise HTTPException(400, "Montant PayPal invalide")
+    if response.status_code >= 400:
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            detail = response.text
+        raise HTTPException(response.status_code, detail or "Paiement PayPal invalide")
 
 
 @app.get("/_health")
@@ -345,3 +301,39 @@ def update_order_status(
     if result.matched_count == 0:
         raise HTTPException(404, "Commande introuvable")
     return {"success": True}
+
+
+@app.post("/internal/orders/{order_id}/payment-completed")
+def payment_completed(
+    order_id: str,
+    data: PaymentCompletedRequest,
+    _internal: None = Depends(_require_internal_token),
+):
+    if not ObjectId.is_valid(order_id):
+        raise HTTPException(400, "Commande invalide")
+
+    order = db.orders.find_one({"_id": ObjectId(order_id)})
+    if not order:
+        raise HTTPException(404, "Commande introuvable")
+
+    paid_statuses = {"Payé", "Livré", "PayÃ©", "LivrÃ©"}
+    if order.get("status") in paid_statuses:
+        return {"success": True, "alreadyProcessed": True}
+
+    result = db.orders.update_one(
+        {
+            "_id": ObjectId(order_id),
+            "status": {"$nin": list(paid_statuses)},
+        },
+        {
+            "$set": {
+                "status": "Payé",
+                "paymentId": data.paymentId,
+            }
+        },
+    )
+    if result.modified_count == 0:
+        return {"success": True, "alreadyProcessed": True}
+
+    _decrement_stock(order.get("items", []), strict=False)
+    return {"success": True, "alreadyProcessed": False}
