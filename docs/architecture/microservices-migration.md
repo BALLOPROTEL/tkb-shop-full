@@ -22,7 +22,7 @@ API Gateway :8000
      +---- /api/users/me
      +---- /api/admin/invites* ---------------------> Auth
      |
-     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- /api/payments* ---------------------------> Payments\n     |       |\n     |       +---- internal payment completed ---------> Orders\n     |\n     +---- Auth ---- internal email -----------------> Notifications\n     |\n     +---- /api/settings\n     +---- /api/newsletter\n     +---- /api/admin/newsletter\n     +---- /api/admin/stats --------------------------> Backoffice\n     |\n     +---- unknown /api/* ----------------------------> Legacy rollback
+     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- /api/payments* ---------------------------> Payments\n     |       |\n     |       +---- internal payment completed ---------> Orders\n     |\n     +---- Auth ---- internal email -----------------> Notifications\n     |\n     +---- /api/settings\n     +---- /api/newsletter\n     +---- /api/admin/newsletter\n     +---- /api/admin/stats --------------------------> Backoffice\n     |\n     +---- unknown /api/* ----------------------------> 404
 ```
 
 ### Completed
