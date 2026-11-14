@@ -86,6 +86,11 @@ def health():
     return {"service": "gateway", "status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    return {"service": "gateway", "status": "ready"}
+
+
 @app.api_route(
     "/api/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
