@@ -57,6 +57,11 @@ def health():
     return {"service": "notifications", "status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    return {"service": "notifications", "status": "ready"}
+
+
 @app.post("/internal/email")
 def send_email(
     data: EmailRequest,
