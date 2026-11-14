@@ -27,6 +27,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
       MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
     depends_on:
       - mongo
     ports:
@@ -59,8 +60,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       PAYMENTS_SERVICE_URL: http://payments:8000
+      CATALOG_SERVICE_URL: http://catalog:8000
     depends_on:
       - mongo
+      - catalog
     ports:
       - "8003:8000"
 

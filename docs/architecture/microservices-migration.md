@@ -96,3 +96,14 @@ Do not add a broker merely to make the architecture look distributed.
 - Gateway routes the bounded context,
 - legacy implementation can be disabled without regression,
 - rollback path documented.
+
+
+## Phase 2 - Catalog data ownership
+
+Orders no longer reads or mutates the Catalog `products` collection directly.
+
+Internal contracts:
+- `POST /internal/catalog/quote` for authoritative pricing and stock validation.
+- `POST /internal/catalog/stock/commit` for token-protected idempotent stock decrements.
+
+Catalog owns the idempotency ledger for stock commits. Orders now depends on Catalog's service contract rather than Catalog persistence.
