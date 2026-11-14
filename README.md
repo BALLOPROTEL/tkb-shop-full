@@ -72,3 +72,32 @@ python scripts/certify_microservices.py
 | Observability / resilience | Planned |
 
 See `docs/architecture/microservices-migration.md`.
+
+
+## Mongo database separation
+
+The microservices runtime uses separate logical databases:
+
+- Auth: `tkb_auth`
+- Catalog: `tkb_catalog`
+- Orders: `tkb_orders`
+- Backoffice: `tkb_backoffice`
+
+Before migrating an existing shared `protel_shop` database, take a backup:
+
+```bash
+mongodump --uri="$MONGO_URI" --db=protel_shop --out=./backup-before-microservices
+```
+
+Then run the idempotent migration:
+
+```bash
+SOURCE_DB=protel_shop \
+AUTH_DB=tkb_auth \
+CATALOG_DB=tkb_catalog \
+ORDERS_DB=tkb_orders \
+BACKOFFICE_DB=tkb_backoffice \
+mongosh "$MONGO_URI" --file scripts/migrate_shared_mongo_to_service_dbs.js
+```
+
+Verify collection counts and run the full certification before changing production traffic. The migration copies data and does not delete the source database, so rollback is performed by restoring the previous service database settings or restoring the `mongodump`.
