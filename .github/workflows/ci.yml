@@ -49,7 +49,7 @@ jobs:
           cache: pip
           cache-dependency-path: services/gateway/requirements.txt
       - run: pip install -r requirements.txt
-      - run: pytest -q
+      - run: PYTHONPATH=. pytest -q
 
   catalog-tests:
     name: Catalog tests
@@ -65,4 +65,4 @@ jobs:
           cache: pip
           cache-dependency-path: services/catalog/requirements.txt
       - run: pip install -r requirements.txt
-      - run: pytest -q
+      - run: PYTHONPATH=. pytest -q
