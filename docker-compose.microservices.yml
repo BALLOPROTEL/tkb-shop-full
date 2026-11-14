@@ -5,30 +5,19 @@ services:
     volumes:
       - tkb_mongo_data:/data/db
 
-  legacy-api:
+  notifications:
     build:
-      context: ./backend
+      context: ./services/notifications
     restart: unless-stopped
     environment:
-      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
-      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
-      PAYPAL_ENV: ${PAYPAL_ENV:-sandbox}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
-    depends_on:
-      - mongo
     ports:
-      - "8005:8000"
+      - "8006:8000"
 
   catalog:
     build:
@@ -56,8 +45,63 @@ services:
       NOTIFICATIONS_SERVICE_URL: http://notifications:8000
     depends_on:
       - mongo
+      - notifications
     ports:
       - "8002:8000"
+
+  orders:
+    build:
+      context: ./services/orders
+    restart: unless-stopped
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      PAYMENTS_SERVICE_URL: http://payments:8000
+    depends_on:
+      - mongo
+    ports:
+      - "8003:8000"
+
+  payments:
+    build:
+      context: ./services/payments
+    restart: unless-stopped
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      ORDERS_SERVICE_URL: http://orders:8000
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
+      STRIPE_AMOUNT_MULTIPLIER: ${STRIPE_AMOUNT_MULTIPLIER:-100}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      PAYPAL_ENV: ${PAYPAL_ENV:-sandbox}
+      PAYPAL_CURRENCY: ${PAYPAL_CURRENCY:-EUR}
+      PAYPAL_FX_RATE: ${PAYPAL_FX_RATE:-655}
+    depends_on:
+      - mongo
+      - orders
+    ports:
+      - "8004:8000"
+
+  backoffice:
+    build:
+      context: ./services/backoffice
+    restart: unless-stopped
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+    depends_on:
+      - mongo
+    ports:
+      - "8007:8000"
 
   gateway:
     build:
@@ -66,12 +110,16 @@ services:
     environment:
       CATALOG_SERVICE_URL: http://catalog:8000
       AUTH_SERVICE_URL: http://auth:8000
-      LEGACY_SERVICE_URL: http://legacy-api:8000
+      ORDERS_SERVICE_URL: http://orders:8000
+      PAYMENTS_SERVICE_URL: http://payments:8000
+      BACKOFFICE_SERVICE_URL: http://backoffice:8000
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     depends_on:
       - catalog
       - auth
-      - legacy-api
+      - orders
+      - payments
+      - backoffice
     ports:
       - "8000:8000"
 

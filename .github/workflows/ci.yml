@@ -146,3 +146,26 @@ jobs:
           cache-dependency-path: services/backoffice/requirements.txt
       - run: pip install -r requirements.txt
       - run: PYTHONPATH=. pytest -q
+
+  microservices-certification:
+    name: Microservices certification
+    runs-on: ubuntu-latest
+    needs:
+      - frontend
+      - python-syntax
+      - gateway-tests
+      - catalog-tests
+      - auth-tests
+      - orders-tests
+      - payments-tests
+      - notifications-tests
+      - backoffice-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Certify full microservices stack
+        env:
+          JWT_SECRET: ci-jwt-secret-change-me
+          INTERNAL_SERVICE_TOKEN: ci-internal-secret-change-me
+          CORS_ORIGINS: http://localhost:5173
+          CLIENT_URL: http://localhost:5173
+        run: python scripts/certify_microservices.py

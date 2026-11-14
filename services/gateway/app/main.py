@@ -4,11 +4,13 @@ import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="TKB Shop API Gateway", version="0.5.0")
+app = FastAPI(title="TKB Shop API Gateway", version="1.0.0")
 
 CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
-LEGACY_SERVICE_URL = os.getenv("LEGACY_SERVICE_URL", "http://legacy-api:8000").rstrip("/")
+ORDERS_SERVICE_URL = os.getenv("ORDERS_SERVICE_URL", "http://orders:8000").rstrip("/")
+PAYMENTS_SERVICE_URL = os.getenv("PAYMENTS_SERVICE_URL", "http://payments:8000").rstrip("/")
+BACKOFFICE_SERVICE_URL = os.getenv("BACKOFFICE_SERVICE_URL", "http://backoffice:8000").rstrip("/")
 
 origins = [
     value.strip()
@@ -36,7 +38,7 @@ HOP_BY_HOP_RESPONSE_HEADERS = {
 }
 
 
-def _target_for(path: str) -> tuple[str, str]:
+def _target_for(path: str) -> tuple[str | None, str]:
     if path == "products" or path.startswith("products/"):
         return CATALOG_SERVICE_URL, "catalog"
 
@@ -46,11 +48,34 @@ def _target_for(path: str) -> tuple[str, str]:
         or path.startswith("users/me/")
         or path == "admin/invites"
         or path.startswith("admin/invites/")
+        or path == "admin/users"
+        or path.startswith("admin/users/")
     )
     if auth_owned:
         return AUTH_SERVICE_URL, "auth"
 
-    return LEGACY_SERVICE_URL, "legacy"
+    orders_owned = (
+        path == "orders"
+        or path.startswith("orders/")
+        or path == "admin/orders"
+        or path.startswith("admin/orders/")
+    )
+    if orders_owned:
+        return ORDERS_SERVICE_URL, "orders"
+
+    if path == "payments" or path.startswith("payments/"):
+        return PAYMENTS_SERVICE_URL, "payments"
+
+    backoffice_owned = (
+        path == "settings"
+        or path == "newsletter"
+        or path == "admin/newsletter"
+        or path == "admin/stats"
+    )
+    if backoffice_owned:
+        return BACKOFFICE_SERVICE_URL, "backoffice"
+
+    return None, "unknown"
 
 
 @app.get("/_health")
@@ -64,8 +89,15 @@ def health():
 )
 async def proxy(path: str, request: Request):
     base_url, routed_service = _target_for(path)
-    target_url = f"{base_url}/api/{path}"
+    if base_url is None:
+        return Response(
+            content='{"detail":"Route API inconnue"}',
+            status_code=404,
+            media_type="application/json",
+            headers={"x-tkb-route": routed_service},
+        )
 
+    target_url = f"{base_url}/api/{path}"
     request_headers = {
         key: value
         for key, value in request.headers.items()
