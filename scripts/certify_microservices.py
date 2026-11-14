@@ -12,17 +12,37 @@ os.environ.setdefault("JWT_SECRET", "ci-jwt-secret-change-me")
 os.environ.setdefault("INTERNAL_SERVICE_TOKEN", "ci-internal-secret-change-me")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 os.environ.setdefault("CLIENT_URL", "http://localhost:5173")
+os.environ.setdefault("AUTH_DB_NAME", "tkb_auth")
+os.environ.setdefault("CATALOG_DB_NAME", "tkb_catalog")
+os.environ.setdefault("ORDERS_DB_NAME", "tkb_orders")
+os.environ.setdefault("BACKOFFICE_DB_NAME", "tkb_backoffice")
+
+AUTH_DB_NAME = os.environ["AUTH_DB_NAME"]
+CATALOG_DB_NAME = os.environ["CATALOG_DB_NAME"]
+ORDERS_DB_NAME = os.environ["ORDERS_DB_NAME"]
+BACKOFFICE_DB_NAME = os.environ["BACKOFFICE_DB_NAME"]
 
 
-def run(*args: str) -> None:
-    subprocess.run([*args], check=True)
+def run(*args: str, capture_output: bool = False) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [*args],
+        check=True,
+        text=True,
+        capture_output=capture_output,
+    )
 
 
-def compose(*args: str) -> None:
-    run(*COMPOSE, *args)
+def compose(*args: str, capture_output: bool = False) -> subprocess.CompletedProcess:
+    return run(*COMPOSE, *args, capture_output=capture_output)
 
 
-def request(method: str, url: str, payload=None, token: str | None = None):
+def request(
+    method: str,
+    url: str,
+    payload=None,
+    token: str | None = None,
+    request_id: str | None = None,
+):
     data = None
     headers = {}
     if payload is not None:
@@ -30,35 +50,148 @@ def request(method: str, url: str, payload=None, token: str | None = None):
         headers["Content-Type"] = "application/json"
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if request_id:
+        headers["X-Request-ID"] = request_id
 
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=20) as response:
             body = response.read().decode()
-            return response.status, json.loads(body) if body else None
+            parsed = json.loads(body) if body else None
+            return response.status, parsed, dict(response.headers)
     except urllib.error.HTTPError as exc:
         body = exc.read().decode()
         try:
             parsed = json.loads(body)
         except json.JSONDecodeError:
             parsed = body
-        return exc.code, parsed
+        return exc.code, parsed, dict(exc.headers)
     except (urllib.error.URLError, ConnectionResetError, OSError) as exc:
-        return 0, {"transport_error": str(exc)}
+        return 0, {"transport_error": str(exc)}, {}
 
 
 def expect(status: int, expected: int, label: str, body) -> None:
     if status != expected:
-        raise AssertionError(f"{label}: expected {expected}, got {status}: {body}")
+        raise AssertionError(
+            f"{label}: expected {expected}, got {status}: {body}"
+        )
 
 
 def wait_for(url: str) -> None:
     for _ in range(60):
-        status, _ = request("GET", url)
+        status, _, _ = request("GET", url)
         if status == 200:
             return
         time.sleep(2)
     raise RuntimeError(f"Timeout waiting for {url}")
+
+
+def mongo_eval(database: str, javascript: str) -> str:
+    result = compose(
+        "exec",
+        "-T",
+        "mongo",
+        "mongosh",
+        "--quiet",
+        database,
+        "--eval",
+        javascript,
+        capture_output=True,
+    )
+    return result.stdout.strip()
+
+
+def assert_service_log_contains(service: str, request_id: str) -> None:
+    needle = f'"request_id": "{request_id}"'
+    for _ in range(10):
+        logs = compose("logs", "--no-color", service, capture_output=True).stdout
+        if needle in logs:
+            return
+        time.sleep(1)
+    raise AssertionError(
+        f"request id {request_id!r} not found in {service} logs"
+    )
+
+
+def assert_database_ownership() -> None:
+    checks = {
+        AUTH_DB_NAME: {
+            "required": ["users"],
+            "forbidden": [
+                "products",
+                "orders",
+                "settings",
+                "newsletter",
+                "stock_commits",
+            ],
+        },
+        CATALOG_DB_NAME: {
+            "required": ["products"],
+            "forbidden": [
+                "users",
+                "orders",
+                "settings",
+                "newsletter",
+                "password_resets",
+                "admin_invites",
+            ],
+        },
+        ORDERS_DB_NAME: {
+            "required": ["orders"],
+            "forbidden": [
+                "users",
+                "products",
+                "settings",
+                "newsletter",
+                "stock_commits",
+                "password_resets",
+                "admin_invites",
+            ],
+        },
+        BACKOFFICE_DB_NAME: {
+            "required": ["settings", "newsletter"],
+            "forbidden": [
+                "users",
+                "products",
+                "orders",
+                "stock_commits",
+                "password_resets",
+                "admin_invites",
+            ],
+        },
+    }
+
+    for database, rules in checks.items():
+        collections = json.loads(
+            mongo_eval(
+                database,
+                "JSON.stringify(db.getCollectionNames().sort())",
+            )
+        )
+        missing = sorted(set(rules["required"]) - set(collections))
+        foreign = sorted(set(rules["forbidden"]) & set(collections))
+        if missing:
+            raise AssertionError(
+                f"{database} missing owned collections: {missing}; "
+                f"actual={collections}"
+            )
+        if foreign:
+            raise AssertionError(
+                f"{database} contains foreign collections: {foreign}; "
+                f"actual={collections}"
+            )
+
+    old_collections = json.loads(
+        mongo_eval(
+            "protel_shop",
+            "JSON.stringify(db.getCollectionNames().sort())",
+        )
+    )
+    if old_collections:
+        raise AssertionError(
+            "legacy protel_shop database should stay unused in the "
+            f"microservices runtime, found: {old_collections}"
+        )
 
 
 def main() -> None:
@@ -108,7 +241,7 @@ def main() -> None:
         print("Readiness checks OK", flush=True)
 
         print("STEP register", flush=True)
-        status, body = request(
+        status, body, _ = request(
             "POST",
             "http://localhost:8000/api/auth/register",
             {
@@ -121,25 +254,17 @@ def main() -> None:
         )
         expect(status, 200, "register", body)
 
-        print("STEP promote admin", flush=True)
-        subprocess.run(
-            [
-                *COMPOSE,
-                "exec",
-                "-T",
-                "mongo",
-                "mongosh",
-                "--quiet",
-                "protel_shop",
-                "--eval",
-                'db.users.updateOne({email:"ci-admin@example.com"}, {$set:{role:"admin"}})',
-            ],
-            check=True,
-            stdout=subprocess.DEVNULL,
+        print("STEP promote admin in auth-owned database", flush=True)
+        mongo_eval(
+            AUTH_DB_NAME,
+            'db.users.updateOne('
+            '{email:"ci-admin@example.com"}, '
+            '{$set:{role:"admin"}}'
+            ')',
         )
 
         print("STEP login", flush=True)
-        status, body = request(
+        status, body, _ = request(
             "POST",
             "http://localhost:8000/api/auth/login",
             {
@@ -150,8 +275,8 @@ def main() -> None:
         expect(status, 200, "login", body)
         token = body["access_token"]
 
-        print("STEP create product", flush=True)
-        status, body = request(
+        print("STEP create product through Auth -> Catalog boundary", flush=True)
+        status, body, _ = request(
             "POST",
             "http://localhost:8000/api/products",
             {
@@ -171,12 +296,12 @@ def main() -> None:
         product_id = body["id"]
 
         print("STEP list products", flush=True)
-        status, body = request("GET", "http://localhost:8000/api/products")
+        status, body, _ = request("GET", "http://localhost:8000/api/products")
         expect(status, 200, "list products", body)
         assert len(body) == 1 and body[0]["name"] == "Produit CI"
 
-        print("STEP quote", flush=True)
-        status, body = request(
+        print("STEP quote through Orders -> Catalog contract", flush=True)
+        status, body, _ = request(
             "POST",
             "http://localhost:8000/api/orders/quote",
             {
@@ -194,7 +319,7 @@ def main() -> None:
         assert body["totalAmount"] == 30000
 
         print("STEP create order", flush=True)
-        status, body = request(
+        status, body, _ = request(
             "POST",
             "http://localhost:8000/api/orders",
             {
@@ -215,7 +340,7 @@ def main() -> None:
         expect(status, 200, "create order", body)
 
         print("STEP my orders", flush=True)
-        status, body = request(
+        status, body, _ = request(
             "GET",
             "http://localhost:8000/api/orders/my-orders",
             token=token,
@@ -223,19 +348,44 @@ def main() -> None:
         expect(status, 200, "my orders", body)
         assert len(body) == 1 and body[0]["status"] == "En attente"
 
-        print("STEP admin stats", flush=True)
-        status, body = request(
+        print("STEP create Backoffice-owned data", flush=True)
+        status, body, _ = request(
+            "POST",
+            "http://localhost:8000/api/settings",
+            {"bannerText": "CI banner"},
+            token,
+        )
+        expect(status, 200, "update settings", body)
+
+        status, body, _ = request(
+            "POST",
+            "http://localhost:8000/api/newsletter",
+            {"email": "ci-newsletter@example.com"},
+        )
+        expect(status, 200, "newsletter", body)
+
+        print("STEP distributed request-id propagation", flush=True)
+        trace_id = "cert-trace-admin-stats"
+        status, body, headers = request(
             "GET",
             "http://localhost:8000/api/admin/stats",
             token=token,
+            request_id=trace_id,
         )
         expect(status, 200, "admin stats", body)
         assert body["usersCount"] == 1
         assert body["productsCount"] == 1
         assert body["ordersCount"] == 1
+        assert headers.get("X-Request-ID") == trace_id
+
+        for service in ("gateway", "backoffice", "auth", "catalog", "orders"):
+            assert_service_log_contains(service, trace_id)
+
+        print("STEP database ownership boundaries", flush=True)
+        assert_database_ownership()
 
         print("STEP unknown route", flush=True)
-        status, body = request(
+        status, body, _ = request(
             "GET",
             "http://localhost:8000/api/this-route-does-not-exist",
         )
@@ -255,5 +405,9 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(f"CERTIFICATION FAILED: {exc}", file=sys.stderr, flush=True)
+        print(
+            f"CERTIFICATION FAILED: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
         raise
