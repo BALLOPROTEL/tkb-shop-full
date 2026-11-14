@@ -53,7 +53,7 @@ The CI includes isolated service tests plus a full Docker Compose certification 
 ```bash
 JWT_SECRET=local-secret \
 INTERNAL_SERVICE_TOKEN=local-internal-secret \
-bash scripts/certify_microservices.sh
+python scripts/certify_microservices.py
 ```
 
 ## Migration status
