@@ -22,7 +22,7 @@ API Gateway :8000
      +---- /api/users/me
      +---- /api/admin/invites* ---------------------> Auth
      |
-     +---- remaining /api/* ------------------------> Legacy FastAPI
+     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- remaining /api/* ------------------------> Legacy FastAPI
 ```
 
 ### Completed
