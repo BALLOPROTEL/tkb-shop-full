@@ -48,3 +48,11 @@ def test_orders_source_has_no_direct_products_collection_access():
     assert "db.products" not in source
     assert "/internal/catalog/quote" in source
     assert "/internal/catalog/stock/commit" in source
+
+
+def test_source_propagates_request_id():
+    import inspect
+    import app.main as service_main
+
+    source = inspect.getsource(service_main)
+    assert "X-Request-ID" in source
