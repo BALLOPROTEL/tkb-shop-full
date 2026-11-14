@@ -74,6 +74,12 @@ def health():
     return {"service": "backoffice", "status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    db.command("ping")
+    return {"service": "backoffice", "status": "ready"}
+
+
 @app.get("/api/settings")
 def get_settings():
     settings = db.settings.find_one({"_id": "global_settings"})
