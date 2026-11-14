@@ -166,3 +166,12 @@ Production cutover procedure:
 4. run microservices certification,
 5. switch service DB environment variables,
 6. retain the source DB until the rollback window closes.
+
+
+## Phase 2 - Exclusive identity secret ownership
+
+Auth is the only service that owns `JWT_SECRET` and decodes application access tokens.
+
+Catalog, Orders, Payments and Backoffice delegate user validation to Auth through the protected internal `/internal/auth/validate` contract.
+
+The end-to-end certification also inspects Mongo collection boundaries and fails if a service database contains foreign domain collections or if the legacy `protel_shop` database is used by the microservices runtime.
