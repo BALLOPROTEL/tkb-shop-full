@@ -254,6 +254,12 @@ def health():
     return {"service": "auth", "status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    db.command("ping")
+    return {"service": "auth", "status": "ready"}
+
+
 @app.post("/internal/auth/validate")
 def internal_validate_token(
     data: InternalTokenValidation,
