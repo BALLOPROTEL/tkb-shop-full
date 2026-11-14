@@ -130,7 +130,7 @@ def main() -> None:
                 "mongo",
                 "mongosh",
                 "--quiet",
-                "protel_shop",
+                "tkb_auth",
                 "--eval",
                 'db.users.updateOne({email:"ci-admin@example.com"}, {$set:{role:"admin"}})',
             ],
