@@ -43,3 +43,12 @@ def test_internal_stock_commit_requires_service_token():
         },
     )
     assert response.status_code in (401, 500)
+
+
+def test_catalog_does_not_access_users_collection_directly():
+    import inspect
+    import app.main as catalog_main
+
+    source = inspect.getsource(catalog_main)
+    assert "db.users" not in source
+    assert "/internal/auth/validate" in source
