@@ -12,4 +12,4 @@ Current routes:
 - `POST /api/admin/invites`
 - `POST /api/admin/invites/accept`
 
-During the migration it still uses the existing MongoDB users/reset/invite collections so production data remains compatible. Transactional email will be moved to Notifications in a later extraction.
+During the migration it still uses the existing MongoDB users/reset/invite collections so production data remains compatible. Email delivery is delegated to the internal Notifications service.

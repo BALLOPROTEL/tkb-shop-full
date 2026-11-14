@@ -52,11 +52,8 @@ services:
       MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      NOTIFICATIONS_SERVICE_URL: http://notifications:8000
     depends_on:
       - mongo
     ports:
