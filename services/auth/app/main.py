@@ -4,6 +4,8 @@ import secrets
 import smtplib
 import ssl
 import time
+
+import httpx
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from typing import Optional
