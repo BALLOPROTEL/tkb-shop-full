@@ -49,6 +49,10 @@ class PaymentCompletedRequest(BaseModel):
     paymentId: Optional[str] = None
 
 
+class CheckoutContextRequest(BaseModel):
+    userEmail: str
+
+
 def _require_jwt_secret() -> str:
     if not JWT_SECRET:
         raise HTTPException(500, "JWT_SECRET non configure")
@@ -268,6 +272,57 @@ def update_order_status(
     if result.matched_count == 0:
         raise HTTPException(404, "Commande introuvable")
     return {"success": True}
+
+
+@app.post("/internal/orders/{order_id}/checkout-context")
+def checkout_context(
+    order_id: str,
+    data: CheckoutContextRequest,
+    _internal: None = Depends(_require_internal_token),
+):
+    if not ObjectId.is_valid(order_id):
+        raise HTTPException(400, "Commande invalide")
+
+    order = db.orders.find_one({"_id": ObjectId(order_id)})
+    if not order:
+        raise HTTPException(404, "Commande introuvable")
+    if order.get("userEmail") != data.userEmail:
+        raise HTTPException(403, "Commande non autorisee")
+
+    items = order.get("items") or []
+    if not items:
+        raise HTTPException(400, "Commande vide")
+
+    return {
+        "orderId": order_id,
+        "items": items,
+        "totalAmount": order.get("totalAmount", 0),
+        "status": order.get("status"),
+    }
+
+
+@app.get("/internal/orders/stats")
+def internal_orders_stats(_internal: None = Depends(_require_internal_token)):
+    paid_statuses = [
+        "Payé",
+        "Livré",
+        "Payé (Vérifié)",
+        "PayÃ©",
+        "LivrÃ©",
+        "PayÃ© (VÃ©rifiÃ©)",
+    ]
+    revenue = list(
+        db.orders.aggregate(
+            [
+                {"$match": {"status": {"$in": paid_statuses}}},
+                {"$group": {"_id": None, "total": {"$sum": "$totalAmount"}}},
+            ]
+        )
+    )
+    return {
+        "ordersCount": db.orders.count_documents({}),
+        "revenue": revenue[0]["total"] if revenue else 0,
+    }
 
 
 @app.post("/internal/orders/{order_id}/payment-completed")
