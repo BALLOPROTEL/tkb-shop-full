@@ -74,9 +74,9 @@ services:
       context: ./services/payments
     restart: unless-stopped
     environment:
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       ORDERS_SERVICE_URL: http://orders:8000
+      AUTH_SERVICE_URL: http://auth:8000
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
@@ -88,6 +88,7 @@ services:
       PAYPAL_CURRENCY: ${PAYPAL_CURRENCY:-EUR}
       PAYPAL_FX_RATE: ${PAYPAL_FX_RATE:-655}
     depends_on:
+      - auth
       - orders
     ports:
       - "8004:8000"
