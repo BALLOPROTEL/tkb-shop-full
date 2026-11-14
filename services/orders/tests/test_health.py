@@ -56,3 +56,13 @@ def test_source_propagates_request_id():
 
     source = inspect.getsource(service_main)
     assert "X-Request-ID" in source
+
+
+def test_orders_source_uses_auth_contract_not_user_collection():
+    import inspect
+    import app.main as orders_main
+
+    source = inspect.getsource(orders_main)
+    assert "db.users" not in source
+    assert "JWT_SECRET" not in source
+    assert "/internal/auth/validate" in source
