@@ -1,6 +1,12 @@
 from fastapi.testclient import TestClient
 
-from app.main import CATALOG_SERVICE_URL, LEGACY_SERVICE_URL, _target_for, app
+from app.main import (
+    AUTH_SERVICE_URL,
+    CATALOG_SERVICE_URL,
+    LEGACY_SERVICE_URL,
+    _target_for,
+    app,
+)
 
 
 client = TestClient(app)
@@ -20,6 +26,22 @@ def test_products_are_routed_to_catalog():
     )
 
 
+def test_auth_routes_are_routed_to_auth_service():
+    for path in (
+        "auth/login",
+        "auth/register",
+        "auth/forgot-password",
+        "auth/reset-password",
+        "users/me",
+        "admin/invites",
+        "admin/invites/accept",
+    ):
+        assert _target_for(path) == (AUTH_SERVICE_URL, "auth")
+
+
 def test_unmigrated_routes_stay_on_legacy():
-    assert _target_for("auth/login") == (LEGACY_SERVICE_URL, "legacy")
     assert _target_for("orders") == (LEGACY_SERVICE_URL, "legacy")
+    assert _target_for("payments/create-stripe-session") == (
+        LEGACY_SERVICE_URL,
+        "legacy",
+    )
