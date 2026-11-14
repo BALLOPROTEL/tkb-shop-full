@@ -111,7 +111,7 @@ Catalog owns the idempotency ledger for stock commits. Orders now depends on Cat
 
 ## Phase 2 - Payments and Backoffice data ownership
 
-Payments no longer reads MongoDB user/order collections. It validates the caller JWT locally and obtains the authorized checkout context from Orders through a protected internal contract.
+Payments no longer reads MongoDB user/order collections and no longer owns the JWT signing secret. It delegates caller identity validation to Auth, then obtains the authorized checkout context from Orders through a protected internal contract.
 
 Backoffice keeps only its own settings/newsletter persistence. Administrative statistics are composed from Auth, Catalog and Orders internal stats endpoints, and admin authorization is validated through Auth.
 
@@ -145,7 +145,7 @@ Auth is now the only service that accesses the `users` collection.
 - Orders admin listings rely on the user snapshot stored on the order rather than reading Auth persistence.
 - Catalog and Orders no longer require JWT signing secrets; they treat Auth as the identity authority.
 
-This removes direct cross-domain access to Auth persistence.
+Payments also delegates identity validation to Auth. Auth is therefore the sole owner of user persistence and JWT verification/signing authority.\n\nThis removes direct cross-domain access to Auth persistence.
 
 
 ## Phase 2 - Physical Mongo isolation
