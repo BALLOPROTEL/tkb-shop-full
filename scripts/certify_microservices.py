@@ -12,14 +12,28 @@ os.environ.setdefault("JWT_SECRET", "ci-jwt-secret-change-me")
 os.environ.setdefault("INTERNAL_SERVICE_TOKEN", "ci-internal-secret-change-me")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 os.environ.setdefault("CLIENT_URL", "http://localhost:5173")
+os.environ.setdefault("AUTH_MONGO_DB_NAME", "tkb_auth")
+os.environ.setdefault("CATALOG_MONGO_DB_NAME", "tkb_catalog")
+os.environ.setdefault("ORDERS_MONGO_DB_NAME", "tkb_orders")
+os.environ.setdefault("BACKOFFICE_MONGO_DB_NAME", "tkb_backoffice")
+
+AUTH_DB = os.environ["AUTH_MONGO_DB_NAME"]
+CATALOG_DB = os.environ["CATALOG_MONGO_DB_NAME"]
+ORDERS_DB = os.environ["ORDERS_MONGO_DB_NAME"]
+BACKOFFICE_DB = os.environ["BACKOFFICE_MONGO_DB_NAME"]
 
 
-def run(*args: str) -> None:
-    subprocess.run([*args], check=True)
+def run(*args: str, capture_output: bool = False) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [*args],
+        check=True,
+        text=True,
+        capture_output=capture_output,
+    )
 
 
-def compose(*args: str) -> None:
-    run(*COMPOSE, *args)
+def compose(*args: str, capture_output: bool = False) -> subprocess.CompletedProcess:
+    return run(*COMPOSE, *args, capture_output=capture_output)
 
 
 def request(method: str, url: str, payload=None, token: str | None = None):
@@ -59,6 +73,60 @@ def wait_for(url: str) -> None:
             return
         time.sleep(2)
     raise RuntimeError(f"Timeout waiting for {url}")
+
+
+def mongo_eval(database: str, javascript: str) -> str:
+    result = compose(
+        "exec",
+        "-T",
+        "mongo",
+        "mongosh",
+        "--quiet",
+        database,
+        "--eval",
+        javascript,
+        capture_output=True,
+    )
+    return result.stdout.strip()
+
+
+def assert_database_ownership() -> None:
+    checks = {
+        AUTH_DB: {
+            "required": {"users"},
+            "forbidden": {"products", "orders", "settings", "newsletter", "stock_commits"},
+        },
+        CATALOG_DB: {
+            "required": {"products"},
+            "forbidden": {"users", "orders", "settings", "newsletter", "password_resets", "admin_invites"},
+        },
+        ORDERS_DB: {
+            "required": {"orders"},
+            "forbidden": {"users", "products", "settings", "newsletter", "stock_commits", "password_resets", "admin_invites"},
+        },
+        BACKOFFICE_DB: {
+            "required": {"settings", "newsletter"},
+            "forbidden": {"users", "products", "orders", "stock_commits", "password_resets", "admin_invites"},
+        },
+    }
+
+    for database, rules in checks.items():
+        raw = mongo_eval(database, "JSON.stringify(db.getCollectionNames().sort())")
+        collections = set(json.loads(raw))
+        missing = sorted(rules["required"] - collections)
+        foreign = sorted(rules["forbidden"] & collections)
+        if missing:
+            raise AssertionError(f"{database} missing owned collections: {missing}")
+        if foreign:
+            raise AssertionError(f"{database} contains foreign collections: {foreign}")
+
+    legacy = json.loads(
+        mongo_eval("protel_shop", "JSON.stringify(db.getCollectionNames().sort())")
+    )
+    if legacy:
+        raise AssertionError(
+            f"legacy protel_shop must stay unused by runtime, found: {legacy}"
+        )
 
 
 def main() -> None:
@@ -130,7 +198,7 @@ def main() -> None:
                 "mongo",
                 "mongosh",
                 "--quiet",
-                "tkb_auth",
+                AUTH_DB,
                 "--eval",
                 'db.users.updateOne({email:"ci-admin@example.com"}, {$set:{role:"admin"}})',
             ],
@@ -223,6 +291,22 @@ def main() -> None:
         expect(status, 200, "my orders", body)
         assert len(body) == 1 and body[0]["status"] == "En attente"
 
+        print("STEP create Backoffice-owned data", flush=True)
+        status, body = request(
+            "POST",
+            "http://localhost:8000/api/settings",
+            {"bannerText": "CI banner"},
+            token,
+        )
+        expect(status, 200, "settings", body)
+
+        status, body = request(
+            "POST",
+            "http://localhost:8000/api/newsletter",
+            {"email": "ci-newsletter@example.com"},
+        )
+        expect(status, 200, "newsletter", body)
+
         print("STEP admin stats", flush=True)
         status, body = request(
             "GET",
@@ -233,6 +317,9 @@ def main() -> None:
         assert body["usersCount"] == 1
         assert body["productsCount"] == 1
         assert body["ordersCount"] == 1
+
+        print("STEP database ownership boundaries", flush=True)
+        assert_database_ownership()
 
         print("STEP unknown route", flush=True)
         status, body = request(
