@@ -493,3 +493,21 @@ def accept_admin_invite(data: AdminInviteAccept):
         {"$set": {"usedAt": _utcnow()}},
     )
     return {"success": True}
+
+
+@app.get("/api/admin/users")
+def get_admin_users(_admin: dict = Depends(get_current_admin)):
+    return [_sanitize_user(user) for user in db.users.find()]
+
+
+@app.delete("/api/admin/users/{user_id}")
+def delete_admin_user(
+    user_id: str,
+    _admin: dict = Depends(get_current_admin),
+):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(400, "Format d'ID invalide")
+    result = db.users.delete_one({"_id": ObjectId(user_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Utilisateur introuvable")
+    return {"success": True}
