@@ -6,17 +6,9 @@ Migrate the current FastAPI monolith without breaking the React frontend or prod
 
 ## Strategy: strangler pattern
 
-The frontend keeps one API base URL. The API Gateway receives every `/api/*` request and decides which service owns the route.
+The frontend keeps one API base URL. The API Gateway receives every `/api/*` request and routes each bounded context to its owner.
 
-### Phase 1 - foundation
-
-- API Gateway introduced.
-- Catalog service extracted from the monolith.
-- Legacy backend containerized.
-- Shared MongoDB is intentionally kept during transition.
-- CI validates frontend build, Python syntax, gateway and catalog smoke tests.
-
-Routing:
+### Current routing
 
 ```text
 React frontend
@@ -24,45 +16,57 @@ React frontend
      v
 API Gateway :8000
      |
-     +---- /api/products* --------> Catalog Service
+     +---- /api/products* --------------------------> Catalog
      |
-     +---- all other /api/* ------> Legacy FastAPI
+     +---- /api/auth/*
+     +---- /api/users/me
+     +---- /api/admin/invites* ---------------------> Auth
+     |
+     +---- remaining /api/* ------------------------> Legacy FastAPI
 ```
 
-This is transitional architecture. A shared database is not the target state.
+### Completed
+
+- API Gateway introduced.
+- Catalog service extracted.
+- Auth / Users service extracted.
+- Legacy backend containerized.
+- Shared MongoDB intentionally retained during the strangler phase.
+- CI validates frontend build, Python syntax and service tests.
+- insecure hard-coded JWT fallback removed.
 
 ## Target bounded contexts
 
 ### Auth service
-Owns users, login, JWT issuance, password reset and admin invitations.
+Owns users, login, JWT issuance, profile, password reset and admin invitations.
 
 ### Catalog service
 Owns products, categories, stock-read model and product administration.
 
 ### Orders service
-Owns carts converted to orders, order lifecycle, quote validation and order history.
+Will own quote validation, order creation, order lifecycle and order history.
 
 ### Payments service
-Owns Stripe and PayPal integrations, webhook verification and payment state.
+Will own Stripe and PayPal integrations, webhook verification and payment state.
 
 ### Notifications service
-Owns transactional email and later asynchronous notifications.
+Will own transactional email and asynchronous notifications. Auth still sends its email directly until this extraction.
 
 ## Data migration target
 
-Each service must eventually own its persistence. The migration order is:
+The current shared MongoDB is transitional, not the target architecture.
 
-1. route ownership,
-2. service API contract,
-3. tests,
-4. collection/database ownership,
-5. remove equivalent route from legacy.
-
-No route is removed from the legacy application before the replacement service is proven through the gateway.
+For each domain:
+1. move route ownership,
+2. stabilize API contract,
+3. add tests,
+4. move collection/database ownership,
+5. disable equivalent legacy route,
+6. preserve a rollback path.
 
 ## Events
 
-After Orders and Payments are extracted, introduce an event broker only where asynchronous behavior creates value. Candidate events:
+After Orders and Payments are extracted, introduce a broker only for valuable asynchronous flows. Candidate events:
 
 - `order.created`
 - `payment.completed`
@@ -70,22 +74,22 @@ After Orders and Payments are extracted, introduce an event broker only where as
 - `stock.changed`
 - `user.registered`
 
-Do not introduce RabbitMQ/Kafka simply to make the architecture look distributed.
+Do not add a broker merely to make the architecture look distributed.
 
 ## Security rules
 
-- No hard-coded JWT fallback secret.
-- Secrets come from environment/platform secret stores.
-- Only the gateway is public in the final topology.
-- Service-to-service authentication will be added before production cutover.
-- Payment webhook endpoints must retain signature verification.
+- no hard-coded JWT fallback secret,
+- secrets from environment/platform secret stores,
+- only the Gateway public in the final topology,
+- service-to-service authentication before final production cutover,
+- payment webhook signature verification is mandatory.
 
 ## Definition of done for each extraction
 
 - frontend contract unchanged or versioned,
-- service has a health endpoint,
-- unit/API smoke tests exist,
-- CI is green,
-- gateway routes the domain to the service,
-- legacy route can be disabled without regression,
+- health endpoint,
+- unit/API smoke tests,
+- CI green,
+- Gateway routes the bounded context,
+- legacy implementation can be disabled without regression,
 - rollback path documented.
