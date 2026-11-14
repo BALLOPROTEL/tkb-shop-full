@@ -38,3 +38,13 @@ def test_quote_rejects_non_positive_quantity():
             [{"product": "507f1f77bcf86cd799439011", "quantity": 0}]
         )
     assert exc.value.status_code == 400
+
+
+def test_orders_source_has_no_direct_products_collection_access():
+    import inspect
+    import app.main as orders_main
+
+    source = inspect.getsource(orders_main)
+    assert "db.products" not in source
+    assert "/internal/catalog/quote" in source
+    assert "/internal/catalog/stock/commit" in source
