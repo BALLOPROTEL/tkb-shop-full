@@ -27,11 +27,8 @@ RESET_PASSWORD_DEBUG = os.getenv("RESET_PASSWORD_DEBUG", "0") == "1"
 ADMIN_INVITE_EXPIRE_MINUTES = int(os.getenv("ADMIN_INVITE_EXPIRE_MINUTES", "5"))
 
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173").rstrip("/")
-SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASS = os.getenv("SMTP_PASS")
-SMTP_FROM = os.getenv("SMTP_FROM") or SMTP_USER or "no-reply@localhost"
+INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
+NOTIFICATIONS_SERVICE_URL = os.getenv("NOTIFICATIONS_SERVICE_URL", "http://notifications:8000").rstrip("/")
 
 RESET_RATE_LIMIT_WINDOW_SEC = int(os.getenv("RESET_RATE_LIMIT_WINDOW_SEC", "600"))
 RESET_RATE_LIMIT_MAX = int(os.getenv("RESET_RATE_LIMIT_MAX", "5"))
@@ -155,23 +152,34 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
-def _send_email(to_email: str, subject: str, html_body: str, text_body: str) -> None:
-    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        raise HTTPException(status_code=500, detail="SMTP non configure")
+def _send_notification(to_email: str, subject: str, html_body: str, text_body: str) -> None:
+    if not INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
 
-    message = EmailMessage()
-    message["From"] = SMTP_FROM
-    message["To"] = to_email
-    message["Subject"] = subject
-    message.set_content(text_body)
-    message.add_alternative(html_body, subtype="html")
+    try:
+        response = httpx.post(
+            f"{NOTIFICATIONS_SERVICE_URL}/internal/email",
+            json={
+                "to": to_email,
+                "subject": subject,
+                "html": html_body,
+                "text": text_body,
+            },
+            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            timeout=20.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"Notifications service indisponible: {exc}")
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
-        server.ehlo()
-        server.starttls(context=context)
-        server.login(SMTP_USER, SMTP_PASS)
-        server.send_message(message)
+    if response.status_code >= 400:
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            detail = response.text
+        raise HTTPException(
+            502,
+            detail or "Echec de l'envoi de notification",
+        )
 
 
 def _email_template(title: str, message: str, action_text: str, action_url: str) -> str:
@@ -323,7 +331,7 @@ def forgot_password(data: ForgotPasswordRequest, request: Request):
         reset_url,
     )
     try:
-        _send_email(
+        _send_notification(
             email,
             "Reinitialisation de votre mot de passe",
             html,
@@ -449,7 +457,7 @@ def create_admin_invite(
         invite_url,
     )
     try:
-        _send_email(
+        _send_notification(
             email,
             "Invitation administrateur TKB SHOP",
             html,
