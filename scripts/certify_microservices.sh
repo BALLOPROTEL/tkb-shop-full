@@ -13,6 +13,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
+fail_response() {
+  local label="$1"
+  local status="$2"
+  local file="$3"
+  echo "[cert] $label failed with HTTP $status"
+  cat "$file" || true
+  exit 1
+}
+
 $COMPOSE config >/dev/null
 $COMPOSE build
 $COMPOSE up -d mongo catalog auth orders payments notifications backoffice gateway
@@ -28,7 +37,7 @@ wait_for() {
   done
   echo "Timeout waiting for $url"
   $COMPOSE ps
-  return 1
+  exit 1
 }
 
 wait_for http://localhost:8000/_health
@@ -39,28 +48,39 @@ wait_for http://localhost:8004/_health
 wait_for http://localhost:8006/_health
 wait_for http://localhost:8007/_health
 
-echo "Health checks OK"
+echo "[cert] health checks OK"
 
-REGISTER_STATUS=$(curl -sS -o /tmp/register.json -w "%{http_code}"   -X POST http://localhost:8000/api/auth/register   -H 'Content-Type: application/json'   -d '{
+echo "[cert] register"
+REGISTER_STATUS=$(curl -sS -o /tmp/register.json -w "%{http_code}" \
+  -X POST http://localhost:8000/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{
     "name":"CI Admin",
     "email":"ci-admin@example.com",
     "password":"StrongPass123!",
     "acceptTerms":true,
     "acceptSalesPolicy":true
   }')
+[ "$REGISTER_STATUS" = "200" ] || fail_response "register" "$REGISTER_STATUS" /tmp/register.json
 
-if [ "$REGISTER_STATUS" != "200" ]; then
-  cat /tmp/register.json
-  exit 1
-fi
+$COMPOSE exec -T mongo mongosh --quiet protel_shop --eval \
+  'db.users.updateOne({email:"ci-admin@example.com"}, {$set:{role:"admin"}})' >/dev/null
 
-$COMPOSE exec -T mongo mongosh --quiet protel_shop --eval   'db.users.updateOne({email:"ci-admin@example.com"}, {$set:{role:"admin"}})' >/dev/null
-
-TOKEN=$(curl -fsS   -X POST http://localhost:8000/api/auth/login   -H 'Content-Type: application/json'   -d '{"email":"ci-admin@example.com","password":"StrongPass123!"}'   | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
-
+echo "[cert] login"
+LOGIN_STATUS=$(curl -sS -o /tmp/login.json -w "%{http_code}" \
+  -X POST http://localhost:8000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ci-admin@example.com","password":"StrongPass123!"}')
+[ "$LOGIN_STATUS" = "200" ] || fail_response "login" "$LOGIN_STATUS" /tmp/login.json
+TOKEN=$(python -c 'import json; print(json.load(open("/tmp/login.json"))["access_token"])')
 test -n "$TOKEN"
 
-PRODUCT_ID=$(curl -fsS   -X POST http://localhost:8000/api/products   -H 'Content-Type: application/json'   -H "Authorization: Bearer $TOKEN"   -d '{
+echo "[cert] create product"
+PRODUCT_STATUS=$(curl -sS -o /tmp/product.json -w "%{http_code}" \
+  -X POST http://localhost:8000/api/products \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
     "name":"Produit CI",
     "category":"Test",
     "price":15000,
@@ -70,29 +90,53 @@ PRODUCT_ID=$(curl -fsS   -X POST http://localhost:8000/api/products   -H 'Conten
     "status":"Active",
     "colors":[],
     "sizes":["Unique"]
-  }'   | python -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-
+  }')
+[ "$PRODUCT_STATUS" = "200" ] || fail_response "create product" "$PRODUCT_STATUS" /tmp/product.json
+PRODUCT_ID=$(python -c 'import json; print(json.load(open("/tmp/product.json"))["id"])')
 test -n "$PRODUCT_ID"
 
-curl -fsS http://localhost:8000/api/products |   python -c 'import json,sys; data=json.load(sys.stdin); assert len(data)==1; assert data[0]["name"]=="Produit CI"'
+echo "[cert] list products"
+curl -fsS http://localhost:8000/api/products | \
+  python -c 'import json,sys; data=json.load(sys.stdin); assert len(data)==1; assert data[0]["name"]=="Produit CI"'
 
-QUOTE=$(curl -fsS   -X POST http://localhost:8000/api/orders/quote   -H 'Content-Type: application/json'   -H "Authorization: Bearer $TOKEN"   -d "{"items":[{"product":"$PRODUCT_ID","quantity":2,"size":"Unique"}]}")
+echo "[cert] quote order"
+QUOTE_PAYLOAD=$(python -c 'import json,sys; print(json.dumps({"items":[{"product":sys.argv[1],"quantity":2,"size":"Unique"}]}))' "$PRODUCT_ID")
+QUOTE_STATUS=$(curl -sS -o /tmp/quote.json -w "%{http_code}" \
+  -X POST http://localhost:8000/api/orders/quote \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "$QUOTE_PAYLOAD")
+[ "$QUOTE_STATUS" = "200" ] || fail_response "quote order" "$QUOTE_STATUS" /tmp/quote.json
+python -c 'import json; data=json.load(open("/tmp/quote.json")); assert data["totalAmount"]==30000'
 
-echo "$QUOTE" | python -c 'import json,sys; data=json.load(sys.stdin); assert data["totalAmount"]==30000'
-
-ORDER_ID=$(curl -fsS   -X POST http://localhost:8000/api/orders   -H 'Content-Type: application/json'   -H "Authorization: Bearer $TOKEN"   -d "{"items":[{"product":"$PRODUCT_ID","quantity":1,"size":"Unique"}],"totalAmount":0,"paymentMethod":"Cash","shippingAddress":"CI","phone":"0000000000"}"   | python -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-
+echo "[cert] create order"
+ORDER_PAYLOAD=$(python -c 'import json,sys; print(json.dumps({"items":[{"product":sys.argv[1],"quantity":1,"size":"Unique"}],"totalAmount":0,"paymentMethod":"Cash","shippingAddress":"CI","phone":"0000000000"}))' "$PRODUCT_ID")
+ORDER_STATUS=$(curl -sS -o /tmp/order.json -w "%{http_code}" \
+  -X POST http://localhost:8000/api/orders \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "$ORDER_PAYLOAD")
+[ "$ORDER_STATUS" = "200" ] || fail_response "create order" "$ORDER_STATUS" /tmp/order.json
+ORDER_ID=$(python -c 'import json; print(json.load(open("/tmp/order.json"))["id"])')
 test -n "$ORDER_ID"
 
-curl -fsS   -H "Authorization: Bearer $TOKEN"   http://localhost:8000/api/orders/my-orders |   python -c 'import json,sys; data=json.load(sys.stdin); assert len(data)==1; assert data[0]["status"]=="En attente"'
+echo "[cert] list my orders"
+curl -fsS \
+  -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8000/api/orders/my-orders | \
+  python -c 'import json,sys; data=json.load(sys.stdin); assert len(data)==1; assert data[0]["status"]=="En attente"'
 
-curl -fsS   -H "Authorization: Bearer $TOKEN"   http://localhost:8000/api/admin/stats |   python -c 'import json,sys; data=json.load(sys.stdin); assert data["usersCount"]==1; assert data["productsCount"]==1; assert data["ordersCount"]==1'
+echo "[cert] admin stats via service contracts"
+curl -fsS \
+  -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8000/api/admin/stats | \
+  python -c 'import json,sys; data=json.load(sys.stdin); assert data["usersCount"]==1; assert data["productsCount"]==1; assert data["ordersCount"]==1'
 
-UNKNOWN_STATUS=$(curl -sS -o /tmp/unknown.json -w "%{http_code}"   http://localhost:8000/api/this-route-does-not-exist)
+echo "[cert] unknown route"
+UNKNOWN_STATUS=$(curl -sS -o /tmp/unknown.json -w "%{http_code}" \
+  http://localhost:8000/api/this-route-does-not-exist)
 if [ "$UNKNOWN_STATUS" != "404" ]; then
-  echo "Expected unknown route to return 404, got $UNKNOWN_STATUS"
-  cat /tmp/unknown.json
-  exit 1
+  fail_response "unknown route" "$UNKNOWN_STATUS" /tmp/unknown.json
 fi
 
-echo "Microservices certification OK"
+echo "[cert] microservices certification OK"
