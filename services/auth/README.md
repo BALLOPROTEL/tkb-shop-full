@@ -10,6 +10,6 @@ Current routes:
 - `GET /api/users/me`
 - `PUT /api/users/me`
 - `POST /api/admin/invites`
-- `POST /api/admin/invites/accept`
+- `POST /api/admin/invites/accept`\n- `GET /api/admin/users`\n- `DELETE /api/admin/users/{id}`
 
 During the migration it still uses the existing MongoDB users/reset/invite collections so production data remains compatible. Email delivery is delegated to the internal Notifications service.
