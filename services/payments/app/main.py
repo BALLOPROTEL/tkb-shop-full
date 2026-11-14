@@ -7,17 +7,13 @@ import urllib.request
 
 import httpx
 import stripe
-from bson import ObjectId
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
-from pymongo import MongoClient
 
-app = FastAPI(title="TKB Shop Payments Service", version="0.1.0")
+app = FastAPI(title="TKB Shop Payments Service", version="0.2.0")
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
@@ -34,8 +30,6 @@ PAYPAL_ENV = os.getenv("PAYPAL_ENV", "sandbox").lower()
 PAYPAL_CURRENCY = os.getenv("PAYPAL_CURRENCY", "EUR")
 PAYPAL_FX_RATE = float(os.getenv("PAYPAL_FX_RATE", "655"))
 
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client.get_database(MONGO_DB_NAME)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
@@ -71,12 +65,29 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             raise unauthorized
     except JWTError:
         raise unauthorized
+    return {"email": email}
 
-    user = db.users.find_one({"email": email})
-    if not user:
-        raise unauthorized
-    user["id"] = str(user["_id"])
-    return user
+
+def _internal_post(url: str, payload: dict) -> dict:
+    if not INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
+    try:
+        response = httpx.post(
+            url,
+            json=payload,
+            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            timeout=20.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"Service interne indisponible: {exc}")
+
+    if response.status_code >= 400:
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            detail = response.text
+        raise HTTPException(response.status_code, detail or "Erreur service interne")
+    return response.json()
 
 
 def _paypal_base_url() -> str:
@@ -170,16 +181,14 @@ def create_stripe_session(data: dict, user: dict = Depends(get_current_user)):
         raise HTTPException(500, "Cle API Stripe non configuree au serveur")
 
     order_id = data.get("orderId") if isinstance(data, dict) else None
-    if not order_id or not ObjectId.is_valid(order_id):
+    if not order_id:
         raise HTTPException(400, "Order invalide")
 
-    order = db.orders.find_one({"_id": ObjectId(order_id)})
-    if not order:
-        raise HTTPException(404, "Commande introuvable")
-    if order.get("userId") != user.get("id"):
-        raise HTTPException(403, "Commande non autorisee")
-
-    items = order.get("items") or []
+    context = _internal_post(
+        f"{ORDERS_SERVICE_URL}/internal/orders/{order_id}/checkout-context",
+        {"userEmail": user["email"]},
+    )
+    items = context.get("items") or []
     if not items:
         raise HTTPException(400, "Commande vide")
 
@@ -236,20 +245,11 @@ async def stripe_webhook(request: Request):
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         order_id = session.get("metadata", {}).get("orderId")
-        if order_id and ObjectId.is_valid(order_id):
-            if not INTERNAL_SERVICE_TOKEN:
-                raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
+        if order_id:
             payment_id = session.get("payment_intent") or session.get("id")
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.post(
-                    f"{ORDERS_SERVICE_URL}/internal/orders/{order_id}/payment-completed",
-                    json={"paymentId": payment_id},
-                    headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
-                )
-            if response.status_code >= 400:
-                raise HTTPException(
-                    502,
-                    f"Orders service rejected payment completion: {response.text}",
-                )
+            _internal_post(
+                f"{ORDERS_SERVICE_URL}/internal/orders/{order_id}/payment-completed",
+                {"paymentId": payment_id},
+            )
 
     return {"received": True}

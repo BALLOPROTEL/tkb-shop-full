@@ -150,6 +150,11 @@ def health():
     return {"service": "catalog", "status": "ok"}
 
 
+@app.get("/internal/catalog/stats")
+def internal_catalog_stats(_internal: None = Depends(_require_internal_token)):
+    return {"productsCount": db.products.count_documents({})}
+
+
 @app.post("/internal/catalog/quote")
 def internal_quote(
     request: CatalogItemsRequest,

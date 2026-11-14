@@ -72,8 +72,6 @@ services:
       context: ./services/payments
     restart: unless-stopped
     environment:
-      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       ORDERS_SERVICE_URL: http://orders:8000
@@ -88,7 +86,6 @@ services:
       PAYPAL_CURRENCY: ${PAYPAL_CURRENCY:-EUR}
       PAYPAL_FX_RATE: ${PAYPAL_FX_RATE:-655}
     depends_on:
-      - mongo
       - orders
     ports:
       - "8004:8000"
@@ -100,9 +97,15 @@ services:
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
       MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      AUTH_SERVICE_URL: http://auth:8000
+      CATALOG_SERVICE_URL: http://catalog:8000
+      ORDERS_SERVICE_URL: http://orders:8000
     depends_on:
       - mongo
+      - auth
+      - catalog
+      - orders
     ports:
       - "8007:8000"
 

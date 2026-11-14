@@ -107,3 +107,12 @@ Internal contracts:
 - `POST /internal/catalog/stock/commit` for token-protected idempotent stock decrements.
 
 Catalog owns the idempotency ledger for stock commits. Orders now depends on Catalog's service contract rather than Catalog persistence.
+
+
+## Phase 2 - Payments and Backoffice data ownership
+
+Payments no longer reads MongoDB user/order collections. It validates the caller JWT locally and obtains the authorized checkout context from Orders through a protected internal contract.
+
+Backoffice keeps only its own settings/newsletter persistence. Administrative statistics are composed from Auth, Catalog and Orders internal stats endpoints, and admin authorization is validated through Auth.
+
+This removes direct cross-domain collection access from Payments and Backoffice.

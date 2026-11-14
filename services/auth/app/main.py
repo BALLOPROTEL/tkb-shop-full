@@ -6,11 +6,12 @@ import ssl
 import time
 
 import httpx
+from bson import ObjectId
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -91,8 +92,19 @@ class AdminInviteAccept(BaseModel):
     token: str
 
 
+class InternalTokenValidation(BaseModel):
+    token: str
+
+
 def _utcnow() -> datetime:
     return datetime.utcnow()
+
+
+def _require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:
+    if not INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
+    if x_internal_token != INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(401, "Service interne non autorise")
 
 
 def _require_jwt_secret() -> str:
@@ -234,6 +246,35 @@ async def get_current_admin(current_user: dict = Depends(get_current_user)) -> d
 @app.get("/_health")
 def health():
     return {"service": "auth", "status": "ok"}
+
+
+@app.post("/internal/auth/validate")
+def internal_validate_token(
+    data: InternalTokenValidation,
+    _internal: None = Depends(_require_internal_token),
+):
+    secret = _require_jwt_secret()
+    try:
+        payload = jwt.decode(
+            data.token.replace("Bearer ", ""),
+            secret,
+            algorithms=[JWT_ALGORITHM],
+        )
+        email = payload.get("sub")
+        if not email:
+            raise ValueError("missing subject")
+    except (JWTError, ValueError):
+        raise HTTPException(401, "Session invalide")
+
+    user = db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(401, "Session invalide")
+    return _sanitize_user(user)
+
+
+@app.get("/internal/auth/stats")
+def internal_auth_stats(_internal: None = Depends(_require_internal_token)):
+    return {"usersCount": db.users.count_documents({})}
 
 
 @app.post("/api/auth/register")
