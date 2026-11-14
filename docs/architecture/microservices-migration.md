@@ -22,7 +22,7 @@ API Gateway :8000
      +---- /api/users/me
      +---- /api/admin/invites* ---------------------> Auth
      |
-     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- /api/payments* ---------------------------> Payments\n     |       |\n     |       +---- internal payment completed ---------> Orders\n     |\n     +---- Auth ---- internal email -----------------> Notifications\n     |\n     +---- remaining /api/* ------------------------> Legacy FastAPI
+     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- /api/payments* ---------------------------> Payments\n     |       |\n     |       +---- internal payment completed ---------> Orders\n     |\n     +---- Auth ---- internal email -----------------> Notifications\n     |\n     +---- /api/settings\n     +---- /api/newsletter\n     +---- /api/admin/newsletter\n     +---- /api/admin/stats --------------------------> Backoffice\n     |\n     +---- unknown /api/* ----------------------------> Legacy rollback
 ```
 
 ### Completed
@@ -51,6 +51,9 @@ Will own Stripe and PayPal integrations, webhook verification and payment state.
 
 ### Notifications service
 Will own transactional email and asynchronous notifications. Auth still sends its email directly until this extraction.
+
+### Backoffice service
+Owns global site settings, newsletter subscriptions/listing and administrative aggregate statistics.
 
 ## Data migration target
 
