@@ -16,7 +16,7 @@ Route ownership:
 - `notifications`: internal transactional email delivery.
 - `backoffice`: settings, newsletter and admin aggregate stats.
 
-Unknown API routes return 404. The legacy FastAPI application is no longer part of the microservices runtime.
+Unknown API routes return 404. The legacy FastAPI application is no longer part of the microservices runtime. Auth is the only service that owns `JWT_SECRET`; Catalog, Orders, Payments and Backoffice validate identities through Auth's internal contract.
 
 ## Run locally
 
@@ -68,8 +68,8 @@ python scripts/certify_microservices.py
 | Notifications | Extracted |
 | Backoffice | Extracted |
 | Legacy runtime | Removed |
-| Database ownership split | In progress |
-| Observability / resilience | Planned |
+| Database ownership split | Complete |
+| Observability / resilience | Complete |
 
 See `docs/architecture/microservices-migration.md`.
 
