@@ -181,6 +181,12 @@ def health():
     return {"service": "orders", "status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    db.command("ping")
+    return {"service": "orders", "status": "ready"}
+
+
 @app.get("/api/orders/my-orders")
 def get_my_orders(user: dict = Depends(get_current_user)):
     orders = []
