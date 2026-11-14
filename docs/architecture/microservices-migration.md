@@ -116,3 +116,21 @@ Payments no longer reads MongoDB user/order collections. It validates the caller
 Backoffice keeps only its own settings/newsletter persistence. Administrative statistics are composed from Auth, Catalog and Orders internal stats endpoints, and admin authorization is validated through Auth.
 
 This removes direct cross-domain collection access from Payments and Backoffice.
+
+
+## Phase 3 - Observability and resilience
+
+Every HTTP request now has a correlation identifier.
+
+- Gateway accepts an incoming `X-Request-ID` or generates one.
+- The same identifier is forwarded to downstream services.
+- Auth, Orders, Payments and Backoffice propagate it on internal HTTP calls.
+- Every service writes a structured JSON access log containing service, request_id, method, path, status and duration_ms.
+- Every response returns `X-Request-ID`.
+
+Health semantics are separated:
+
+- `/_health`: liveness — the process is running.
+- `/ready`: readiness — the service is ready to serve traffic; Mongo-backed services verify database connectivity.
+
+The full Docker certification validates both liveness and readiness before running the business flow.
