@@ -153,6 +153,12 @@ def health():
     return {"service": "catalog", "status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    db.command("ping")
+    return {"service": "catalog", "status": "ready"}
+
+
 @app.get("/internal/catalog/stats")
 def internal_catalog_stats(_internal: None = Depends(_require_internal_token)):
     return {"productsCount": db.products.count_documents({})}
