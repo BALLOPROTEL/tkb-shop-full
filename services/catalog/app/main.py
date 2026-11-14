@@ -20,8 +20,6 @@ INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 
 client = MongoClient(MONGO_URI)
 db = client.get_database(MONGO_DB_NAME)
-db.stock_commits.create_index("key", unique=True)
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
@@ -169,6 +167,8 @@ def internal_stock_commit(
     key = request.idempotencyKey.strip()
     if not key:
         raise HTTPException(400, "idempotencyKey manquante")
+
+    db.stock_commits.create_index("key", unique=True)
 
     try:
         db.stock_commits.insert_one(
