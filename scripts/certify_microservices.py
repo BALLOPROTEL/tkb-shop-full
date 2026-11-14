@@ -43,6 +43,8 @@ def request(method: str, url: str, payload=None, token: str | None = None):
         except json.JSONDecodeError:
             parsed = body
         return exc.code, parsed
+    except (urllib.error.URLError, ConnectionResetError, OSError) as exc:
+        return 0, {"transport_error": str(exc)}
 
 
 def expect(status: int, expected: int, label: str, body) -> None:
