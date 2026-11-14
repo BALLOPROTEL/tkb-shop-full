@@ -15,7 +15,7 @@ app = FastAPI(title="TKB Shop Orders Service", version="0.3.0")
 install_observability(app, "orders")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tkb_orders")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 PAYMENTS_SERVICE_URL = os.getenv("PAYMENTS_SERVICE_URL", "http://payments:8000").rstrip("/")
 CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")

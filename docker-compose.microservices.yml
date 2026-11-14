@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      MONGO_DB_NAME: ${CATALOG_MONGO_DB_NAME:-tkb_catalog}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       AUTH_SERVICE_URL: http://auth:8000
     depends_on:
@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      MONGO_DB_NAME: ${AUTH_MONGO_DB_NAME:-tkb_auth}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      MONGO_DB_NAME: ${ORDERS_MONGO_DB_NAME:-tkb_orders}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       PAYMENTS_SERVICE_URL: http://payments:8000
       CATALOG_SERVICE_URL: http://catalog:8000
@@ -98,7 +98,7 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      MONGO_DB_NAME: ${BACKOFFICE_MONGO_DB_NAME:-tkb_backoffice}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       AUTH_SERVICE_URL: http://auth:8000
       CATALOG_SERVICE_URL: http://catalog:8000

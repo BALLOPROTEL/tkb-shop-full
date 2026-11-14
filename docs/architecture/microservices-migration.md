@@ -146,3 +146,23 @@ Auth is now the only service that accesses the `users` collection.
 - Catalog and Orders no longer require JWT signing secrets; they treat Auth as the identity authority.
 
 This removes direct cross-domain access to Auth persistence.
+
+
+## Phase 2 - Physical Mongo isolation
+
+Stateful bounded contexts now use separate logical Mongo databases:
+
+- `tkb_auth`
+- `tkb_catalog`
+- `tkb_orders`
+- `tkb_backoffice`
+
+The migration script `scripts/migrate_shared_mongo_to_service_dbs.js` copies existing documents by `_id` with idempotent upserts. It intentionally leaves the legacy source database untouched to preserve a rollback path.
+
+Production cutover procedure:
+1. create a `mongodump`,
+2. run the migration,
+3. compare collection counts,
+4. run microservices certification,
+5. switch service DB environment variables,
+6. retain the source DB until the rollback window closes.
