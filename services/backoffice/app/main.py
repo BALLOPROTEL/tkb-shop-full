@@ -1,19 +1,20 @@
 import os
 from datetime import datetime
 
-from bson import ObjectId
-from fastapi import Depends, FastAPI, HTTPException, status
+import httpx
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from pymongo import MongoClient
 
-app = FastAPI(title="TKB Shop Backoffice Service", version="0.1.0")
+app = FastAPI(title="TKB Shop Backoffice Service", version="0.2.0")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = "HS256"
+INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
+CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
+ORDERS_SERVICE_URL = os.getenv("ORDERS_SERVICE_URL", "http://orders:8000").rstrip("/")
 
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database(MONGO_DB_NAME)
@@ -28,34 +29,35 @@ class NewsletterSignup(BaseModel):
     email: EmailStr
 
 
-def _require_jwt_secret() -> str:
-    if not JWT_SECRET:
-        raise HTTPException(500, "JWT_SECRET non configure")
-    return JWT_SECRET
-
-
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    secret = _require_jwt_secret()
-    unauthorized = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Session invalide",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+def _internal_request(method: str, url: str, payload: dict | None = None) -> dict:
+    if not INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
     try:
-        payload = jwt.decode(token.replace("Bearer ", ""), secret, algorithms=[JWT_ALGORITHM])
-        email = payload.get("sub")
-        if not email:
-            raise unauthorized
-    except JWTError:
-        raise unauthorized
+        response = httpx.request(
+            method,
+            url,
+            json=payload,
+            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            timeout=20.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"Service interne indisponible: {exc}")
 
-    user = db.users.find_one({"email": email})
-    if not user:
-        raise unauthorized
-    return user
+    if response.status_code >= 400:
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            detail = response.text
+        raise HTTPException(response.status_code, detail or "Erreur service interne")
+    return response.json()
 
 
-async def get_current_admin(user: dict = Depends(get_current_user)) -> dict:
+async def get_current_admin(token: str = Depends(oauth2_scheme)) -> dict:
+    user = _internal_request(
+        "POST",
+        f"{AUTH_SERVICE_URL}/internal/auth/validate",
+        {"token": token},
+    )
     if user.get("role") != "admin":
         raise HTTPException(403, "Acces administrateur requis")
     return user
@@ -115,25 +117,12 @@ def list_newsletter(_admin: dict = Depends(get_current_admin)):
 
 @app.get("/api/admin/stats")
 def get_stats(_admin: dict = Depends(get_current_admin)):
-    paid_statuses = [
-        "Payé",
-        "Livré",
-        "Payé (Vérifié)",
-        "PayÃ©",
-        "LivrÃ©",
-        "PayÃ© (VÃ©rifiÃ©)",
-    ]
-    revenue = list(
-        db.orders.aggregate(
-            [
-                {"$match": {"status": {"$in": paid_statuses}}},
-                {"$group": {"_id": None, "total": {"$sum": "$totalAmount"}}},
-            ]
-        )
-    )
+    auth_stats = _internal_request("GET", f"{AUTH_SERVICE_URL}/internal/auth/stats")
+    catalog_stats = _internal_request("GET", f"{CATALOG_SERVICE_URL}/internal/catalog/stats")
+    orders_stats = _internal_request("GET", f"{ORDERS_SERVICE_URL}/internal/orders/stats")
     return {
-        "revenue": revenue[0]["total"] if revenue else 0,
-        "usersCount": db.users.count_documents({}),
-        "productsCount": db.products.count_documents({}),
-        "ordersCount": db.orders.count_documents({}),
+        "revenue": orders_stats.get("revenue", 0),
+        "usersCount": auth_stats.get("usersCount", 0),
+        "productsCount": catalog_stats.get("productsCount", 0),
+        "ordersCount": orders_stats.get("ordersCount", 0),
     }
