@@ -95,6 +95,18 @@ def main() -> None:
             wait_for(url)
         print("Health checks OK", flush=True)
 
+        for url in (
+            "http://localhost:8000/ready",
+            "http://localhost:8001/ready",
+            "http://localhost:8002/ready",
+            "http://localhost:8003/ready",
+            "http://localhost:8004/ready",
+            "http://localhost:8006/ready",
+            "http://localhost:8007/ready",
+        ):
+            wait_for(url)
+        print("Readiness checks OK", flush=True)
+
         print("STEP register", flush=True)
         status, body = request(
             "POST",

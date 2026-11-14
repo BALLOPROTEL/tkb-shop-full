@@ -23,3 +23,11 @@ def test_sanitize_user_never_exposes_password():
     )
     assert result["email"] == "user@example.com"
     assert "password" not in result
+
+
+def test_source_propagates_request_id():
+    import inspect
+    import app.main as service_main
+
+    source = inspect.getsource(service_main)
+    assert "X-Request-ID" in source

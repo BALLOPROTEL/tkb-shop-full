@@ -4,6 +4,8 @@ from typing import List, Optional
 
 from bson import ObjectId
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+from app.observability import install_observability
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
@@ -11,6 +13,7 @@ from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
 app = FastAPI(title="TKB Shop Catalog Service", version="0.2.0")
+install_observability(app, "catalog")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
@@ -148,6 +151,12 @@ def _normalize_items(items: List[CatalogItemRequest]) -> tuple[list[dict], float
 @app.get("/_health")
 def health():
     return {"service": "catalog", "status": "ok"}
+
+
+@app.get("/ready")
+def readiness():
+    db.command("ping")
+    return {"service": "catalog", "status": "ready"}
 
 
 @app.get("/internal/catalog/stats")

@@ -10,7 +10,10 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
+from app.observability import get_request_id, install_observability
+
 app = FastAPI(title="TKB Shop Orders Service", version="0.3.0")
+install_observability(app, "orders")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
@@ -131,7 +134,10 @@ def _internal_post(url: str, payload: dict) -> dict:
         response = httpx.post(
             url,
             json=payload,
-            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            headers={
+                "X-Internal-Token": INTERNAL_SERVICE_TOKEN,
+                "X-Request-ID": get_request_id() or "",
+            },
             timeout=20.0,
         )
     except httpx.HTTPError as exc:
@@ -173,6 +179,12 @@ def _verify_paypal_order(order_id: str, expected_total: float) -> None:
 @app.get("/_health")
 def health():
     return {"service": "orders", "status": "ok"}
+
+
+@app.get("/ready")
+def readiness():
+    db.command("ping")
+    return {"service": "orders", "status": "ready"}
 
 
 @app.get("/api/orders/my-orders")

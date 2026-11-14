@@ -22,6 +22,23 @@ fail_response() {
   exit 1
 }
 
+assert_trace_log() {
+  local service="$1"
+  local request_id="$2"
+  local attempts=10
+
+  for _ in $(seq 1 "$attempts"); do
+    if $COMPOSE logs --no-color "$service" 2>&1 | grep -Fq "\"request_id\": \"$request_id\""; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "[cert] request id $request_id not found in $service logs"
+  $COMPOSE logs --no-color "$service" || true
+  exit 1
+}
+
 $COMPOSE config >/dev/null
 $COMPOSE build
 $COMPOSE up -d mongo catalog auth orders payments notifications backoffice gateway
@@ -40,15 +57,15 @@ wait_for() {
   exit 1
 }
 
-wait_for http://localhost:8000/_health
-wait_for http://localhost:8001/_health
-wait_for http://localhost:8002/_health
-wait_for http://localhost:8003/_health
-wait_for http://localhost:8004/_health
-wait_for http://localhost:8006/_health
-wait_for http://localhost:8007/_health
+wait_for http://localhost:8001/ready
+wait_for http://localhost:8002/ready
+wait_for http://localhost:8003/ready
+wait_for http://localhost:8004/ready
+wait_for http://localhost:8006/ready
+wait_for http://localhost:8007/ready
+wait_for http://localhost:8000/ready
 
-echo "[cert] health checks OK"
+echo "[cert] readiness checks OK"
 
 echo "[cert] register"
 REGISTER_STATUS=$(curl -sS -o /tmp/register.json -w "%{http_code}" \
@@ -126,11 +143,17 @@ curl -fsS \
   http://localhost:8000/api/orders/my-orders | \
   python -c 'import json,sys; data=json.load(sys.stdin); assert len(data)==1; assert data[0]["status"]=="En attente"'
 
-echo "[cert] admin stats via service contracts"
+echo "[cert] distributed request-id propagation through admin stats"
+TRACE_ID="cert-trace-admin-stats"
 curl -fsS \
   -H "Authorization: Bearer $TOKEN" \
+  -H "X-Request-ID: $TRACE_ID" \
   http://localhost:8000/api/admin/stats | \
   python -c 'import json,sys; data=json.load(sys.stdin); assert data["usersCount"]==1; assert data["productsCount"]==1; assert data["ordersCount"]==1'
+
+for service in gateway backoffice auth catalog orders; do
+  assert_trace_log "$service" "$TRACE_ID"
+done
 
 echo "[cert] unknown route"
 UNKNOWN_STATUS=$(curl -sS -o /tmp/unknown.json -w "%{http_code}" \
