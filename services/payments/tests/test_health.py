@@ -26,3 +26,14 @@ def test_internal_paypal_endpoint_rejects_missing_internal_token():
 
 def test_paypal_defaults_to_sandbox():
     assert "sandbox.paypal.com" in _paypal_base_url()
+
+
+def test_payments_source_has_no_mongo_persistence_access():
+    import inspect
+    import app.main as payments_main
+
+    source = inspect.getsource(payments_main)
+    assert "MongoClient" not in source
+    assert "db.users" not in source
+    assert "db.orders" not in source
+    assert "/checkout-context" in source
