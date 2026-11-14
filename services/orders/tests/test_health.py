@@ -56,3 +56,12 @@ def test_source_propagates_request_id():
 
     source = inspect.getsource(service_main)
     assert "X-Request-ID" in source
+
+
+def test_orders_does_not_access_users_collection_directly():
+    import inspect
+    import app.main as orders_main
+
+    source = inspect.getsource(orders_main)
+    assert "db.users" not in source
+    assert "/internal/auth/validate" in source
