@@ -22,7 +22,7 @@ API Gateway :8000
      +---- /api/users/me
      +---- /api/admin/invites* ---------------------> Auth
      |
-     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- remaining /api/* ------------------------> Legacy FastAPI
+     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- /api/payments* ---------------------------> Payments\n     |       |\n     |       +---- internal payment completed ---------> Orders\n     |\n     +---- remaining /api/* ------------------------> Legacy FastAPI
 ```
 
 ### Completed
