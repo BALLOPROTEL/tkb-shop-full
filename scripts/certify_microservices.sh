@@ -7,6 +7,10 @@ export JWT_SECRET="${JWT_SECRET:-ci-jwt-secret-change-me}"
 export INTERNAL_SERVICE_TOKEN="${INTERNAL_SERVICE_TOKEN:-ci-internal-secret-change-me}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:5173}"
 export CLIENT_URL="${CLIENT_URL:-http://localhost:5173}"
+export AUTH_DB_NAME="${AUTH_DB_NAME:-tkb_auth}"
+export CATALOG_DB_NAME="${CATALOG_DB_NAME:-tkb_catalog}"
+export ORDERS_DB_NAME="${ORDERS_DB_NAME:-tkb_orders}"
+export BACKOFFICE_DB_NAME="${BACKOFFICE_DB_NAME:-tkb_backoffice}"
 
 cleanup() {
   $COMPOSE down -v --remove-orphans >/dev/null 2>&1 || true
@@ -80,7 +84,7 @@ REGISTER_STATUS=$(curl -sS -o /tmp/register.json -w "%{http_code}" \
   }')
 [ "$REGISTER_STATUS" = "200" ] || fail_response "register" "$REGISTER_STATUS" /tmp/register.json
 
-$COMPOSE exec -T mongo mongosh --quiet protel_shop --eval \
+$COMPOSE exec -T mongo mongosh --quiet "$AUTH_DB_NAME" --eval \
   'db.users.updateOne({email:"ci-admin@example.com"}, {$set:{role:"admin"}})' >/dev/null
 
 echo "[cert] login"
@@ -154,6 +158,50 @@ curl -fsS \
 for service in gateway backoffice auth catalog orders; do
   assert_trace_log "$service" "$TRACE_ID"
 done
+
+echo "[cert] create backoffice-owned data"
+SETTINGS_STATUS=$(curl -sS -o /tmp/settings.json -w "%{http_code}" \
+  -X POST http://localhost:8000/api/settings \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"bannerText":"CI banner"}')
+[ "$SETTINGS_STATUS" = "200" ] || fail_response "update settings" "$SETTINGS_STATUS" /tmp/settings.json
+
+NEWSLETTER_STATUS=$(curl -sS -o /tmp/newsletter.json -w "%{http_code}" \
+  -X POST http://localhost:8000/api/newsletter \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ci-newsletter@example.com"}')
+[ "$NEWSLETTER_STATUS" = "200" ] || fail_response "newsletter" "$NEWSLETTER_STATUS" /tmp/newsletter.json
+
+echo "[cert] database ownership"
+$COMPOSE exec -T mongo mongosh --quiet "$AUTH_DB_NAME" --eval '
+  const forbidden = ["products","orders","settings","newsletter","stock_commits"];
+  const bad = db.getCollectionNames().filter((name) => forbidden.includes(name));
+  if (bad.length) { print("auth contains foreign collections: " + bad.join(",")); quit(1); }
+  if (!db.getCollectionNames().includes("users")) { print("auth users missing"); quit(1); }
+' >/dev/null
+
+$COMPOSE exec -T mongo mongosh --quiet "$CATALOG_DB_NAME" --eval '
+  const forbidden = ["users","orders","settings","newsletter","password_resets","admin_invites"];
+  const bad = db.getCollectionNames().filter((name) => forbidden.includes(name));
+  if (bad.length) { print("catalog contains foreign collections: " + bad.join(",")); quit(1); }
+  if (!db.getCollectionNames().includes("products")) { print("catalog products missing"); quit(1); }
+' >/dev/null
+
+$COMPOSE exec -T mongo mongosh --quiet "$ORDERS_DB_NAME" --eval '
+  const forbidden = ["users","products","settings","newsletter","stock_commits","password_resets"];
+  const bad = db.getCollectionNames().filter((name) => forbidden.includes(name));
+  if (bad.length) { print("orders contains foreign collections: " + bad.join(",")); quit(1); }
+  if (!db.getCollectionNames().includes("orders")) { print("orders collection missing"); quit(1); }
+' >/dev/null
+
+$COMPOSE exec -T mongo mongosh --quiet "$BACKOFFICE_DB_NAME" --eval '
+  const forbidden = ["users","products","orders","stock_commits","password_resets","admin_invites"];
+  const bad = db.getCollectionNames().filter((name) => forbidden.includes(name));
+  if (bad.length) { print("backoffice contains foreign collections: " + bad.join(",")); quit(1); }
+  if (!db.getCollectionNames().includes("settings")) { print("backoffice settings missing"); quit(1); }
+  if (!db.getCollectionNames().includes("newsletter")) { print("backoffice newsletter missing"); quit(1); }
+' >/dev/null
 
 echo "[cert] unknown route"
 UNKNOWN_STATUS=$(curl -sS -o /tmp/unknown.json -w "%{http_code}" \
