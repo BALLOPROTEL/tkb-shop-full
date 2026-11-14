@@ -4,9 +4,10 @@ import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="TKB Shop API Gateway", version="0.1.0")
+app = FastAPI(title="TKB Shop API Gateway", version="0.2.0")
 
 CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
 LEGACY_SERVICE_URL = os.getenv("LEGACY_SERVICE_URL", "http://legacy-api:8000").rstrip("/")
 
 origins = [
@@ -38,6 +39,17 @@ HOP_BY_HOP_RESPONSE_HEADERS = {
 def _target_for(path: str) -> tuple[str, str]:
     if path == "products" or path.startswith("products/"):
         return CATALOG_SERVICE_URL, "catalog"
+
+    auth_owned = (
+        path.startswith("auth/")
+        or path == "users/me"
+        or path.startswith("users/me/")
+        or path == "admin/invites"
+        or path.startswith("admin/invites/")
+    )
+    if auth_owned:
+        return AUTH_SERVICE_URL, "auth"
+
     return LEGACY_SERVICE_URL, "legacy"
 
 

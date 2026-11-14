@@ -1,5 +1,15 @@
 # Auth service
 
-Planned extraction scope: users, login, JWT issuance, profile, password reset and admin invitation flows.
+Owns the TKB Shop identity and user-account HTTP contract.
 
-Until extracted, the API Gateway routes these endpoints to the legacy backend.
+Current routes:
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET /api/users/me`
+- `PUT /api/users/me`
+- `POST /api/admin/invites`
+- `POST /api/admin/invites/accept`
+
+During the migration it still uses the existing MongoDB users/reset/invite collections so production data remains compatible. Transactional email will be moved to Notifications in a later extraction.
