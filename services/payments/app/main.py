@@ -7,20 +7,18 @@ import urllib.request
 
 import httpx
 import stripe
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from app.observability import get_request_id, install_observability
 
-app = FastAPI(title="TKB Shop Payments Service", version="0.2.0")
+app = FastAPI(title="TKB Shop Payments Service", version="0.3.0")
 install_observability(app, "payments")
 
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = "HS256"
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 ORDERS_SERVICE_URL = os.getenv("ORDERS_SERVICE_URL", "http://orders:8000").rstrip("/")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173").rstrip("/")
 
 STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "eur")
@@ -41,12 +39,6 @@ class PayPalVerifyRequest(BaseModel):
     expectedTotal: float
 
 
-def _require_jwt_secret() -> str:
-    if not JWT_SECRET:
-        raise HTTPException(500, "JWT_SECRET non configure")
-    return JWT_SECRET
-
-
 def _require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:
     if not INTERNAL_SERVICE_TOKEN:
         raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
@@ -55,20 +47,10 @@ def _require_internal_token(x_internal_token: str | None = Header(default=None))
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    secret = _require_jwt_secret()
-    unauthorized = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Session invalide",
-        headers={"WWW-Authenticate": "Bearer"},
+    return _internal_post(
+        f"{AUTH_SERVICE_URL}/internal/auth/validate",
+        {"token": token},
     )
-    try:
-        payload = jwt.decode(token.replace("Bearer ", ""), secret, algorithms=[JWT_ALGORITHM])
-        email = payload.get("sub")
-        if not email:
-            raise unauthorized
-    except JWTError:
-        raise unauthorized
-    return {"email": email}
 
 
 def _internal_post(url: str, payload: dict) -> dict:
