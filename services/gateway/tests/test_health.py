@@ -1,3 +1,4 @@
+import httpx
 from fastapi.testclient import TestClient
 
 from app.main import (
@@ -14,6 +15,13 @@ from app.main import (
 client = TestClient(app)
 
 
+class FakeResponse:
+    def __init__(self, status_code=200, content=b"[]", headers=None):
+        self.status_code = status_code
+        self.content = content
+        self.headers = headers or {"content-type": "application/json"}
+
+
 def test_gateway_health():
     response = client.get("/_health")
     assert response.status_code == 200
@@ -27,10 +35,54 @@ def test_gateway_preserves_caller_request_id():
     assert response.headers["x-request-id"] == "trace-test-123"
 
 
-def test_gateway_readiness():
-    response = client.get("/ready")
+def test_gateway_readiness_checks_dependencies(monkeypatch):
+    async def fake_get(self, url, headers=None):
+        assert headers["X-Request-ID"] == "ready-trace"
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    response = client.get("/ready", headers={"X-Request-ID": "ready-trace"})
+
     assert response.status_code == 200
-    assert response.json() == {"service": "gateway", "status": "ready"}
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert all(payload["dependencies"].values())
+
+
+def test_gateway_readiness_fails_when_dependency_is_down(monkeypatch):
+    async def fake_get(self, url, headers=None):
+        status_code = 503 if "orders" in url else 200
+        return FakeResponse(status_code=status_code)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    response = client.get("/ready")
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "not_ready"
+    assert payload["dependencies"]["orders"] is False
+
+
+def test_gateway_propagates_request_id_to_upstream(monkeypatch):
+    async def fake_request(
+        self,
+        method,
+        url,
+        params=None,
+        content=None,
+        headers=None,
+    ):
+        assert headers["x-request-id"] == "proxy-trace-123"
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+    response = client.get(
+        "/api/products",
+        headers={"X-Request-ID": "proxy-trace-123"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "proxy-trace-123"
 
 
 def test_catalog_routing():
