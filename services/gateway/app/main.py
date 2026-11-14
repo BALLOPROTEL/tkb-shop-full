@@ -4,7 +4,10 @@ import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="TKB Shop API Gateway", version="1.0.0")
+from app.observability import install_observability
+
+app = FastAPI(title="TKB Shop API Gateway", version="1.1.0")
+install_observability(app, "gateway")
 
 CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
@@ -103,6 +106,7 @@ async def proxy(path: str, request: Request):
         for key, value in request.headers.items()
         if key.lower() not in {"host", "content-length"}
     }
+    request_headers["x-request-id"] = request.state.request_id
 
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
         upstream = await client.request(
