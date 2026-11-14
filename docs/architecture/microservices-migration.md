@@ -134,3 +134,15 @@ Health semantics are separated:
 - `/ready`: readiness — the service is ready to serve traffic; Mongo-backed services verify database connectivity.
 
 The full Docker certification validates both liveness and readiness before running the business flow.
+
+
+## Phase 2 - Auth data ownership
+
+Auth is now the only service that accesses the `users` collection.
+
+- Catalog delegates administrator identity validation to `POST /internal/auth/validate`.
+- Orders delegates customer/admin identity validation to Auth.
+- Orders admin listings rely on the user snapshot stored on the order rather than reading Auth persistence.
+- Catalog and Orders no longer require JWT signing secrets; they treat Auth as the identity authority.
+
+This removes direct cross-domain access to Auth persistence.
