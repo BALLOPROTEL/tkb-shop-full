@@ -44,7 +44,7 @@ VITE_API_BASE_URL=http://localhost:8000 npm run dev
 | API Gateway | Active |
 | Catalog | Extracted |
 | Auth / Users | Extracted |
-| Orders | Planned |
+| Orders | Extracted |
 | Payments | Planned |
 | Notifications / email | Planned |
 | Legacy monolith | Fallback during migration |
