@@ -47,6 +47,6 @@ VITE_API_BASE_URL=http://localhost:8000 npm run dev
 | Orders | Extracted |
 | Payments | Extracted |
 | Notifications / email | Extracted |
-| Legacy monolith | Fallback during migration |
+| Legacy monolith | Removed from runtime |
 
 See `docs/architecture/microservices-migration.md`.
