@@ -18,7 +18,10 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from pymongo import MongoClient
 
+from app.observability import get_request_id, install_observability
+
 app = FastAPI(title="TKB Shop Auth Service", version="0.1.0")
+install_observability(app, "auth")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
@@ -179,7 +182,10 @@ def _send_notification(to_email: str, subject: str, html_body: str, text_body: s
                 "html": html_body,
                 "text": text_body,
             },
-            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            headers={
+                "X-Internal-Token": INTERNAL_SERVICE_TOKEN,
+                "X-Request-ID": get_request_id() or "",
+            },
             timeout=20.0,
         )
     except httpx.HTTPError as exc:
