@@ -168,4 +168,4 @@ jobs:
           INTERNAL_SERVICE_TOKEN: ci-internal-secret-change-me
           CORS_ORIGINS: http://localhost:5173
           CLIENT_URL: http://localhost:5173
-        run: bash scripts/certify_microservices.sh
+        run: python scripts/certify_microservices.py
