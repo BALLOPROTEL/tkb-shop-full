@@ -18,6 +18,19 @@ def test_gateway_health():
     response = client.get("/_health")
     assert response.status_code == 200
     assert response.json() == {"service": "gateway", "status": "ok"}
+    assert response.headers["x-request-id"]
+
+
+def test_gateway_preserves_caller_request_id():
+    response = client.get("/_health", headers={"X-Request-ID": "trace-test-123"})
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "trace-test-123"
+
+
+def test_gateway_readiness():
+    response = client.get("/ready")
+    assert response.status_code == 200
+    assert response.json() == {"service": "gateway", "status": "ready"}
 
 
 def test_catalog_routing():
