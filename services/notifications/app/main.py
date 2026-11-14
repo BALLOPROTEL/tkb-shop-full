@@ -4,9 +4,12 @@ import ssl
 from email.message import EmailMessage
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+
+from app.observability import install_observability
 from pydantic import BaseModel, EmailStr
 
 app = FastAPI(title="TKB Shop Notifications Service", version="0.1.0")
+install_observability(app, "notifications")
 
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 SMTP_HOST = os.getenv("SMTP_HOST")
