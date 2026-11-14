@@ -168,6 +168,11 @@ def health():
     return {"service": "payments", "status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    return {"service": "payments", "status": "ready"}
+
+
 @app.post("/internal/paypal/verify")
 def verify_paypal(
     data: PayPalVerifyRequest,
