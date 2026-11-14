@@ -37,3 +37,11 @@ def test_payments_source_has_no_mongo_persistence_access():
     assert "db.users" not in source
     assert "db.orders" not in source
     assert "/checkout-context" in source
+
+
+def test_source_propagates_request_id():
+    import inspect
+    import app.main as service_main
+
+    source = inspect.getsource(service_main)
+    assert "X-Request-ID" in source
