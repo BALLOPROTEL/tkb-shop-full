@@ -25,11 +25,12 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      MONGO_DB_NAME: ${CATALOG_DB_NAME:-tkb_catalog}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      AUTH_SERVICE_URL: http://auth:8000
     depends_on:
       - mongo
+      - auth
     ports:
       - "8001:8000"
 
@@ -39,7 +40,7 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      MONGO_DB_NAME: ${AUTH_DB_NAME:-tkb_auth}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
@@ -56,13 +57,14 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      MONGO_DB_NAME: ${ORDERS_DB_NAME:-tkb_orders}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       PAYMENTS_SERVICE_URL: http://payments:8000
       CATALOG_SERVICE_URL: http://catalog:8000
+      AUTH_SERVICE_URL: http://auth:8000
     depends_on:
       - mongo
+      - auth
       - catalog
     ports:
       - "8003:8000"
@@ -72,9 +74,9 @@ services:
       context: ./services/payments
     restart: unless-stopped
     environment:
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       ORDERS_SERVICE_URL: http://orders:8000
+      AUTH_SERVICE_URL: http://auth:8000
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
@@ -86,6 +88,7 @@ services:
       PAYPAL_CURRENCY: ${PAYPAL_CURRENCY:-EUR}
       PAYPAL_FX_RATE: ${PAYPAL_FX_RATE:-655}
     depends_on:
+      - auth
       - orders
     ports:
       - "8004:8000"
@@ -96,7 +99,7 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
-      MONGO_DB_NAME: ${MONGO_DB_NAME:-protel_shop}
+      MONGO_DB_NAME: ${BACKOFFICE_DB_NAME:-tkb_backoffice}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       AUTH_SERVICE_URL: http://auth:8000
       CATALOG_SERVICE_URL: http://catalog:8000
