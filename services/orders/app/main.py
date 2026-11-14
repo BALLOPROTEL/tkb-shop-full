@@ -6,7 +6,6 @@ import httpx
 from bson import ObjectId
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
@@ -17,11 +16,10 @@ install_observability(app, "orders")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = "HS256"
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 PAYMENTS_SERVICE_URL = os.getenv("PAYMENTS_SERVICE_URL", "http://payments:8000").rstrip("/")
 CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
 
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database(MONGO_DB_NAME)
@@ -56,12 +54,6 @@ class CheckoutContextRequest(BaseModel):
     userEmail: str
 
 
-def _require_jwt_secret() -> str:
-    if not JWT_SECRET:
-        raise HTTPException(500, "JWT_SECRET non configure")
-    return JWT_SECRET
-
-
 def _require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:
     if not INTERNAL_SERVICE_TOKEN:
         raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
@@ -70,26 +62,10 @@ def _require_internal_token(x_internal_token: str | None = Header(default=None))
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    secret = _require_jwt_secret()
-    unauthorized = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Session invalide",
-        headers={"WWW-Authenticate": "Bearer"},
+    return _internal_post(
+        f"{AUTH_SERVICE_URL}/internal/auth/validate",
+        {"token": token},
     )
-    try:
-        payload = jwt.decode(token.replace("Bearer ", ""), secret, algorithms=[JWT_ALGORITHM])
-        email = payload.get("sub")
-        if not email:
-            raise unauthorized
-    except JWTError:
-        raise unauthorized
-
-    user = db.users.find_one({"email": email})
-    if not user:
-        raise unauthorized
-    user["id"] = str(user["_id"])
-    return user
-
 
 async def get_current_admin(user: dict = Depends(get_current_user)) -> dict:
     if user.get("role") != "admin":
@@ -199,30 +175,13 @@ def get_my_orders(user: dict = Depends(get_current_user)):
 @app.get("/api/admin/orders")
 def get_admin_orders(_admin: dict = Depends(get_current_admin)):
     orders = []
-    users_cache: dict[str, Optional[dict]] = {}
-
     for order in db.orders.find().sort("createdAt", -1):
         order["id"] = str(order.pop("_id"))
-        user_id = order.get("userId")
-        if user_id:
-            if user_id not in users_cache:
-                users_cache[user_id] = (
-                    db.users.find_one({"_id": ObjectId(user_id)})
-                    if ObjectId.is_valid(user_id)
-                    else None
-                )
-            user = users_cache[user_id]
-            if user:
-                order.setdefault("userName", user.get("name"))
-                order.setdefault("userEmail", user.get("email"))
-
         if order.get("items"):
             order.setdefault("productName", order["items"][0].get("name"))
         order.setdefault("totalPrice", order.get("totalAmount"))
         orders.append(order)
-
     return orders
-
 
 @app.post("/api/orders")
 def create_order(order: Order, user: dict = Depends(get_current_user)):
