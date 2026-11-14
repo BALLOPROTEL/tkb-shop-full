@@ -2,24 +2,23 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
+import httpx
 from bson import ObjectId
-from fastapi import Depends, FastAPI, Header, HTTPException, status
-
-from app.observability import install_observability
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+
+from app.observability import get_request_id, install_observability
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
-app = FastAPI(title="TKB Shop Catalog Service", version="0.2.0")
+app = FastAPI(title="TKB Shop Catalog Service", version="0.3.0")
 install_observability(app, "catalog")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = "HS256"
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tkb_catalog")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
 
 client = MongoClient(MONGO_URI)
 db = client.get_database(MONGO_DB_NAME)
@@ -72,29 +71,32 @@ def _require_internal_token(x_internal_token: str | None = Header(default=None))
         raise HTTPException(401, "Service interne non autorise")
 
 
-def _require_admin(token: str = Depends(oauth2_scheme)) -> dict:
-    if not JWT_SECRET:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="JWT_SECRET non configure",
-        )
-    try:
-        payload = jwt.decode(token.replace("Bearer ", ""), JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        email = payload.get("sub")
-        if not email:
-            raise ValueError("missing subject")
-    except (JWTError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session invalide",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+def _validate_user(token: str) -> dict:
+    if not INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
 
-    user = db.users.find_one({"email": email})
-    if not user:
-        raise HTTPException(status_code=401, detail="Session invalide")
+    try:
+        response = httpx.post(
+            f"{AUTH_SERVICE_URL}/internal/auth/validate",
+            json={"token": token},
+            headers={
+                "X-Internal-Token": INTERNAL_SERVICE_TOKEN,
+                "X-Request-ID": get_request_id() or "",
+            },
+            timeout=10.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"Auth indisponible: {exc}")
+
+    if response.status_code >= 400:
+        raise HTTPException(response.status_code, "Session invalide")
+    return response.json()
+
+
+def _require_admin(token: str = Depends(oauth2_scheme)) -> dict:
+    user = _validate_user(token)
     if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Acces administrateur requis")
+        raise HTTPException(403, "Acces administrateur requis")
     return user
 
 
