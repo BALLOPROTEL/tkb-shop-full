@@ -45,3 +45,13 @@ def test_source_propagates_request_id():
 
     source = inspect.getsource(service_main)
     assert "X-Request-ID" in source
+
+
+def test_payments_source_delegates_identity_to_auth():
+    import inspect
+    import app.main as payments_main
+
+    source = inspect.getsource(payments_main)
+    assert "JWT_SECRET" not in source
+    assert "jwt.decode" not in source
+    assert "/internal/auth/validate" in source
