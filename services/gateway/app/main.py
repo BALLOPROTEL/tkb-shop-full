@@ -4,7 +4,7 @@ import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="TKB Shop API Gateway", version="0.5.0")
+app = FastAPI(title="TKB Shop API Gateway", version="1.0.0")
 
 CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
@@ -50,7 +50,7 @@ def _target_for(path: str) -> tuple[str, str]:
     if auth_owned:
         return AUTH_SERVICE_URL, "auth"
 
-    return LEGACY_SERVICE_URL, "legacy"
+    return None, "unknown"
 
 
 @app.get("/_health")
@@ -64,6 +64,13 @@ def health():
 )
 async def proxy(path: str, request: Request):
     base_url, routed_service = _target_for(path)
+    if base_url is None:
+        return Response(
+            content='{"detail":"Route API inconnue"}',
+            status_code=404,
+            media_type="application/json",
+            headers={"x-tkb-route": routed_service},
+        )
     target_url = f"{base_url}/api/{path}"
 
     request_headers = {
