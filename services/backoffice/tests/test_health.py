@@ -28,3 +28,11 @@ def test_backoffice_source_aggregates_via_service_contracts():
     assert "/internal/auth/stats" in source
     assert "/internal/catalog/stats" in source
     assert "/internal/orders/stats" in source
+
+
+def test_source_propagates_request_id():
+    import inspect
+    import app.main as service_main
+
+    source = inspect.getsource(service_main)
+    assert "X-Request-ID" in source
