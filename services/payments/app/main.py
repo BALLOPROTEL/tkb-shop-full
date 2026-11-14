@@ -12,7 +12,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
+from app.observability import get_request_id, install_observability
+
 app = FastAPI(title="TKB Shop Payments Service", version="0.2.0")
+install_observability(app, "payments")
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
@@ -75,7 +78,10 @@ def _internal_post(url: str, payload: dict) -> dict:
         response = httpx.post(
             url,
             json=payload,
-            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            headers={
+                "X-Internal-Token": INTERNAL_SERVICE_TOKEN,
+                "X-Request-ID": get_request_id() or "",
+            },
             timeout=20.0,
         )
     except httpx.HTTPError as exc:
