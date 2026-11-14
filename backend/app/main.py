@@ -28,7 +28,9 @@ from dotenv import load_dotenv # Indispensable pour lire le fichier .env
 env_path = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=env_path)
 
-SECRET_KEY = os.getenv("JWT_SECRET", "TKB_PRIVATE_KEY_2026_SECURE_99_STAY_RIGOROUS")
+SECRET_KEY = os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET must be configured; refusing to start with an insecure fallback")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 heures
 RESET_TOKEN_EXPIRE_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "30"))
