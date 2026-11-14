@@ -998,7 +998,7 @@ def list_newsletter(admin: dict = Depends(get_current_admin)):
 @app.get("/api/admin/stats")
 def get_stats(admin: dict = Depends(get_current_admin)):
     total_revenue = db.orders.aggregate([
-        {"$match": {"status": {"$in": ["PayÃ©", "LivrÃ©", "PayÃ© (VÃ©rifiÃ©)"]}}},
+        {"$match": {"status": {"$in": ["Payé", "Livré", "Payé (Vérifié)", "PayÃ©", "LivrÃ©", "PayÃ© (VÃ©rifiÃ©)"]}}},
         {"$group": {"_id": None, "total": {"$sum": "$totalAmount"}}}
     ])
     rev_list = list(total_revenue)
