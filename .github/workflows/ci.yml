@@ -130,3 +130,19 @@ jobs:
           cache-dependency-path: services/notifications/requirements.txt
       - run: pip install -r requirements.txt
       - run: PYTHONPATH=. pytest -q
+
+  backoffice-tests:
+    name: Backoffice tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/backoffice
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/backoffice/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
