@@ -7,7 +7,10 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, EmailStr
 from pymongo import MongoClient
 
+from app.observability import get_request_id, install_observability
+
 app = FastAPI(title="TKB Shop Backoffice Service", version="0.2.0")
+install_observability(app, "backoffice")
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "protel_shop")
@@ -37,7 +40,10 @@ def _internal_request(method: str, url: str, payload: dict | None = None) -> dic
             method,
             url,
             json=payload,
-            headers={"X-Internal-Token": INTERNAL_SERVICE_TOKEN},
+            headers={
+                "X-Internal-Token": INTERNAL_SERVICE_TOKEN,
+                "X-Request-ID": get_request_id() or "",
+            },
             timeout=20.0,
         )
     except httpx.HTTPError as exc:
