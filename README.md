@@ -1,42 +1,40 @@
 # TKB Shop
 
-TKB Shop is an e-commerce application built with React/Vite and FastAPI/MongoDB.
+TKB Shop is an e-commerce application with a React/Vite frontend and a FastAPI microservices backend.
 
-## Microservices runtime
+## Architecture
 
-The frontend keeps a stable `/api/*` contract and talks only to the API Gateway.
+The frontend keeps a single `/api/*` contract and talks only to the API Gateway.
 
-Route ownership:
+| Service | Responsibility | Persistence |
+| --- | --- | --- |
+| Gateway | Single public API entry point, routing, request correlation, aggregated readiness | Stateless |
+| Auth | Users, login, JWT issuance/validation, profile, password reset, admin invitations | `tkb_auth` |
+| Catalog | Products, pricing, stock, product administration | `tkb_catalog` |
+| Orders | Quote orchestration, order lifecycle, history, order statistics | `tkb_orders` |
+| Payments | Stripe/PayPal integration, webhooks, payment orchestration | Stateless |
+| Notifications | Transactional SMTP email delivery | Stateless |
+| Backoffice | Settings, newsletter and aggregate administration statistics | `tkb_backoffice` |
 
-- `gateway`: public API entry point.
-- `catalog`: `/api/products*`.
-- `auth`: `/api/auth/*`, `/api/users/me`, `/api/admin/invites*`, `/api/admin/users*`.
-- `orders`: `/api/orders*`, `/api/admin/orders`.
-- `payments`: `/api/payments*`, Stripe and PayPal integrations.
-- `notifications`: internal transactional email delivery.
-- `backoffice`: settings, newsletter and admin aggregate stats.
+Auth is the exclusive JWT authority. Other services validate identity through the protected internal Auth contract rather than sharing the JWT secret.
 
-Unknown API routes return 404. The legacy FastAPI application is no longer part of the microservices runtime.
+Stateful bounded contexts use separate logical MongoDB databases and do not read another domain's collections directly.
 
-## Run locally
+## Local development
 
-1. Copy `.env.microservices.example` to `.env`.
-2. Set strong values for `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN`.
-3. Run:
+1. Copy the example environment file:
+
+```bash
+cp .env.microservices.example .env
+```
+
+2. Replace the placeholder secrets, especially `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN`.
+
+3. Start the stack:
 
 ```bash
 docker compose -f docker-compose.microservices.yml up --build
 ```
-
-Health endpoints:
-
-- Gateway: http://localhost:8000/_health
-- Catalog: http://localhost:8001/_health
-- Auth: http://localhost:8002/_health
-- Orders: http://localhost:8003/_health
-- Payments: http://localhost:8004/_health
-- Notifications: http://localhost:8006/_health
-- Backoffice: http://localhost:8007/_health
 
 Frontend:
 
@@ -46,9 +44,50 @@ npm ci
 VITE_API_BASE_URL=http://localhost:8000 npm run dev
 ```
 
-## Certification
+## Health and readiness
 
-The CI includes isolated service tests plus a full Docker Compose certification that exercises the system through the API Gateway.
+| Service | Liveness |
+| --- | --- |
+| Gateway | http://localhost:8000/_health |
+| Catalog | http://localhost:8001/_health |
+| Auth | http://localhost:8002/_health |
+| Orders | http://localhost:8003/_health |
+| Payments | http://localhost:8004/_health |
+| Notifications | http://localhost:8006/_health |
+| Backoffice | http://localhost:8007/_health |
+
+Every service also exposes `/ready`. Mongo-backed services verify database connectivity, while Gateway readiness aggregates its direct dependencies.
+
+## Observability
+
+All services emit structured JSON access logs with:
+
+- service name
+- `request_id`
+- HTTP method and path
+- response status
+- request duration
+
+Gateway accepts or generates `X-Request-ID`, returns it to the caller and propagates it through internal service calls.
+
+## CI and certification
+
+The protected `main` branch requires these checks before merge:
+
+1. Frontend build
+2. Python syntax
+3. Gateway tests
+4. Catalog tests
+5. Auth tests
+6. Orders tests
+7. Payments tests
+8. Notifications tests
+9. Backoffice tests
+10. Microservices certification
+
+The full certification starts the Docker Compose stack, waits for liveness/readiness and exercises the application through the Gateway.
+
+Run it locally with:
 
 ```bash
 JWT_SECRET=local-secret \
@@ -60,30 +99,25 @@ python scripts/certify_microservices.py
 
 | Domain | Status |
 | --- | --- |
-| API Gateway | Active |
-| Catalog | Extracted |
-| Auth / Users | Extracted |
-| Orders | Extracted |
-| Payments | Extracted |
-| Notifications | Extracted |
-| Backoffice | Extracted |
-| Legacy runtime | Removed |
-| Database ownership split | In progress |
-| Observability / resilience | Planned |
+| API Gateway | Complete |
+| Catalog | Complete |
+| Auth / Users | Complete |
+| Orders | Complete |
+| Payments | Complete |
+| Notifications | Complete |
+| Backoffice | Complete |
+| Legacy runtime removal | Complete |
+| Cross-domain persistence removal | Complete |
+| Physical MongoDB separation | Complete |
+| Auth as exclusive JWT authority | Complete |
+| Observability / readiness | Complete |
+| End-to-end microservices certification | Complete |
 
-See `docs/architecture/microservices-migration.md`.
+The repository architecture is migration-complete and CI-certified. Deployment of the distributed backend to a production platform is a separate operational step and must be validated per environment.
 
+## Existing-data migration
 
-## Mongo database separation
-
-The microservices runtime uses separate logical databases:
-
-- Auth: `tkb_auth`
-- Catalog: `tkb_catalog`
-- Orders: `tkb_orders`
-- Backoffice: `tkb_backoffice`
-
-Before migrating an existing shared `protel_shop` database, take a backup:
+Before migrating an existing shared `protel_shop` database, create a backup:
 
 ```bash
 mongodump --uri="$MONGO_URI" --db=protel_shop --out=./backup-before-microservices
@@ -100,4 +134,6 @@ BACKOFFICE_DB=tkb_backoffice \
 mongosh "$MONGO_URI" --file scripts/migrate_shared_mongo_to_service_dbs.js
 ```
 
-Verify collection counts and run the full certification before changing production traffic. The migration copies data and does not delete the source database, so rollback is performed by restoring the previous service database settings or restoring the `mongodump`.
+The migration keeps the source database intact so the rollback window remains available.
+
+For the detailed architecture and migration decisions, see `docs/architecture/microservices-migration.md`.
