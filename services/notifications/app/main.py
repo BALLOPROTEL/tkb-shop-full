@@ -4,6 +4,7 @@ import ssl
 from email.message import EmailMessage
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import JSONResponse
 
 from app.observability import install_observability
 from pydantic import BaseModel, EmailStr
@@ -59,6 +60,24 @@ def health():
 
 @app.get("/ready")
 def readiness():
+    missing = [
+        name
+        for name, value in (
+            ("SMTP_HOST", SMTP_HOST),
+            ("SMTP_USER", SMTP_USER),
+            ("SMTP_PASS", SMTP_PASS),
+        )
+        if not value
+    ]
+    if missing:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "service": "notifications",
+                "status": "not_ready",
+                "missing": missing,
+            },
+        )
     return {"service": "notifications", "status": "ready"}
 
 
