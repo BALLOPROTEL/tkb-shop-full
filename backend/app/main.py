@@ -44,11 +44,14 @@ else:
     CORS_ORIGINS = [os.getenv("CLIENT_URL", "http://localhost:5173")]
 
 # Stripe
-STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "eur")
+STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "xof").lower()
 try:
-    STRIPE_AMOUNT_MULTIPLIER = int(os.getenv("STRIPE_AMOUNT_MULTIPLIER", "100"))
+    STRIPE_AMOUNT_MULTIPLIER = int(os.getenv("STRIPE_AMOUNT_MULTIPLIER", "1"))
 except ValueError:
-    STRIPE_AMOUNT_MULTIPLIER = 100
+    STRIPE_AMOUNT_MULTIPLIER = 1
+
+if STRIPE_CURRENCY == "xof" and STRIPE_AMOUNT_MULTIPLIER != 1:
+    raise RuntimeError("Configuration Stripe invalide: XOF exige un multiplicateur de 1")
 
 # Configuration Stripe avec verification
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -908,7 +911,7 @@ async def create_stripe_session(data: dict, user: dict = Depends(get_current_use
                         'name': item.get('name'),
                         'images': [item.get('image')] if item.get('image') else [],
                     },
-                    # Stripe = unites minimales (ex: centimes si EUR)
+                    # Stripe = unites minimales; XOF est une devise a zero decimale
                     'unit_amount': unit_amount,
                 },
                 'quantity': item.get('quantity', 1),
