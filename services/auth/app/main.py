@@ -21,7 +21,7 @@ from pymongo import MongoClient
 
 from app.observability import get_request_id, install_observability
 
-app = FastAPI(title="TKB Shop Auth Service", version="0.1.0")
+app = FastAPI(title="TKB Shop Auth Service", version="0.1.1")
 install_observability(app, "auth")
 
 
@@ -45,6 +45,8 @@ ADMIN_INVITE_EXPIRE_MINUTES = int(os.getenv("ADMIN_INVITE_EXPIRE_MINUTES", "5"))
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173").rstrip("/")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 NOTIFICATIONS_SERVICE_URL = _service_url("NOTIFICATIONS_SERVICE_URL", "http://notifications:8000")
+NOTIFICATIONS_WAKE_TIMEOUT_SECONDS = float(os.getenv("NOTIFICATIONS_WAKE_TIMEOUT_SECONDS", "90"))
+NOTIFICATIONS_WAKE_INTERVAL_SECONDS = float(os.getenv("NOTIFICATIONS_WAKE_INTERVAL_SECONDS", "2"))
 
 RESET_RATE_LIMIT_WINDOW_SEC = int(os.getenv("RESET_RATE_LIMIT_WINDOW_SEC", "600"))
 RESET_RATE_LIMIT_MAX = int(os.getenv("RESET_RATE_LIMIT_MAX", "5"))
@@ -188,9 +190,37 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
+def _wait_for_notifications_health() -> bool:
+    deadline = time.monotonic() + NOTIFICATIONS_WAKE_TIMEOUT_SECONDS
+    headers = {"X-Request-ID": get_request_id() or ""}
+
+    while True:
+        try:
+            response = httpx.get(
+                f"{NOTIFICATIONS_SERVICE_URL}/_health",
+                headers=headers,
+                timeout=5.0,
+            )
+            if response.status_code == 200:
+                return True
+        except httpx.HTTPError:
+            pass
+
+        if time.monotonic() >= deadline:
+            return False
+
+        time.sleep(NOTIFICATIONS_WAKE_INTERVAL_SECONDS)
+
+
 def _send_notification(to_email: str, subject: str, html_body: str, text_body: str) -> None:
     if not INTERNAL_SERVICE_TOKEN:
         raise HTTPException(500, "INTERNAL_SERVICE_TOKEN non configure")
+
+    if not _wait_for_notifications_health():
+        raise HTTPException(
+            503,
+            "Service email en cours de demarrage. Reessayez dans quelques instants.",
+        )
 
     try:
         response = httpx.post(
@@ -207,17 +237,16 @@ def _send_notification(to_email: str, subject: str, html_body: str, text_body: s
             },
             timeout=20.0,
         )
-    except httpx.HTTPError as exc:
-        raise HTTPException(502, f"Notifications service indisponible: {exc}")
+    except httpx.HTTPError:
+        raise HTTPException(
+            503,
+            "Service email temporairement indisponible. Reessayez dans quelques instants.",
+        )
 
     if response.status_code >= 400:
-        try:
-            detail = response.json().get("detail")
-        except ValueError:
-            detail = response.text
         raise HTTPException(
-            502,
-            detail or "Echec de l'envoi de notification",
+            503,
+            "Service email temporairement indisponible. Reessayez dans quelques instants.",
         )
 
 
