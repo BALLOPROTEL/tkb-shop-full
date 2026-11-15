@@ -1,0 +1,218 @@
+name: Staging E2E Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/staging-e2e-smoke.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-e2e-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Gateway → Auth → Catalog → Orders → Stripe sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      API_BASE_URL: https://tkb-gateway-staging-6dt7.onrender.com
+
+    steps:
+      - name: Wake staging microservices
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            code="$(curl -sS -o /tmp/bootstrap.json -w '%{http_code}' "$API_BASE_URL/api/system/bootstrap" || true)"
+            if [ "$code" = "200" ] && [ "$(jq -r '.status // empty' /tmp/bootstrap.json)" = "ready" ]; then
+              cat /tmp/bootstrap.json
+              exit 0
+            fi
+            echo "Attempt $attempt: bootstrap HTTP $code"
+            sleep 5
+          done
+          echo "Staging bootstrap failed"
+          cat /tmp/bootstrap.json || true
+          exit 1
+
+      - name: Register and login synthetic client
+        id: auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          email="tkb-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT@example.com"
+          password="Smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-Aa1!"
+
+          register_payload="$(jq -n             --arg email "$email"             --arg password "$password"             '{
+              firstName:"Recette",
+              lastName:"TKB",
+              name:"Recette TKB",
+              email:$email,
+              password:$password,
+              country:"FR",
+              phone:"0600000000",
+              acceptTerms:true,
+              acceptSalesPolicy:true,
+              acceptMarketing:false,
+              acceptOrderTracking:false
+            }')"
+
+          register_code="$(curl -sS -o /tmp/register.json -w '%{http_code}'             -X POST "$API_BASE_URL/api/auth/register"             -H 'Content-Type: application/json'             --data "$register_payload")"
+
+          test "$register_code" = "200" || {
+            echo "Registration failed: HTTP $register_code"
+            cat /tmp/register.json
+            exit 1
+          }
+
+          login_payload="$(jq -n --arg email "$email" --arg password "$password" '{email:$email,password:$password}')"
+          login_code="$(curl -sS -o /tmp/login.json -w '%{http_code}'             -X POST "$API_BASE_URL/api/auth/login"             -H 'Content-Type: application/json'             --data "$login_payload")"
+
+          test "$login_code" = "200" || {
+            echo "Login failed: HTTP $login_code"
+            cat /tmp/login.json
+            exit 1
+          }
+
+          token="$(jq -r '.access_token // empty' /tmp/login.json)"
+          user_id="$(jq -r '.user.id // empty' /tmp/login.json)"
+          test -n "$token"
+          test -n "$user_id"
+
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          echo "email=$email" >> "$GITHUB_OUTPUT"
+          echo "user_id=$user_id" >> "$GITHUB_OUTPUT"
+
+      - name: Validate catalog and server quote
+        id: catalog
+        shell: bash
+        env:
+          TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          set -euo pipefail
+          products_code="$(curl -sS -o /tmp/products.json -w '%{http_code}' "$API_BASE_URL/api/products")"
+          test "$products_code" = "200"
+
+          product_id="$(jq -r '[.[] | select(.name | startswith("[RECETTE]"))][0].id // empty' /tmp/products.json)"
+          product_name="$(jq -r '[.[] | select(.name | startswith("[RECETTE]"))][0].name // empty' /tmp/products.json)"
+          stock="$(jq -r '[.[] | select(.name | startswith("[RECETTE]"))][0].stock // empty' /tmp/products.json)"
+          test -n "$product_id"
+          test -n "$product_name"
+          test "$stock" -gt 0
+
+          quote_payload="$(jq -n --arg product "$product_id" '{items:[{product:$product,quantity:1,size:"Unique"}]}')"
+          quote_code="$(curl -sS -o /tmp/quote.json -w '%{http_code}'             -X POST "$API_BASE_URL/api/orders/quote"             -H 'Content-Type: application/json'             -H "Authorization: Bearer $TOKEN"             --data "$quote_payload")"
+
+          test "$quote_code" = "200" || {
+            echo "Quote failed: HTTP $quote_code"
+            cat /tmp/quote.json
+            exit 1
+          }
+
+          total="$(jq -r '.totalAmount // empty' /tmp/quote.json)"
+          test -n "$total"
+
+          echo "product_id=$product_id" >> "$GITHUB_OUTPUT"
+          echo "product_name=$product_name" >> "$GITHUB_OUTPUT"
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+
+      - name: Create pending Stripe order
+        id: order
+        shell: bash
+        env:
+          TOKEN: ${{ steps.auth.outputs.token }}
+          PRODUCT_ID: ${{ steps.catalog.outputs.product_id }}
+          PRODUCT_NAME: ${{ steps.catalog.outputs.product_name }}
+          TOTAL: ${{ steps.catalog.outputs.total }}
+        run: |
+          set -euo pipefail
+          order_payload="$(jq -n             --arg product "$PRODUCT_ID"             --arg name "$PRODUCT_NAME"             --argjson total "$TOTAL"             '{
+              items:[{product:$product,name:$name,quantity:1,price:$total,size:"Unique"}],
+              totalAmount:$total,
+              paymentMethod:"Stripe",
+              shippingAddress:"[RECETTE E2E] 1 Rue de Recette, Paris",
+              phone:"0600000000"
+            }')"
+
+          order_code="$(curl -sS -o /tmp/order.json -w '%{http_code}'             -X POST "$API_BASE_URL/api/orders"             -H 'Content-Type: application/json'             -H "Authorization: Bearer $TOKEN"             --data "$order_payload")"
+
+          test "$order_code" = "200" || {
+            echo "Order creation failed: HTTP $order_code"
+            cat /tmp/order.json
+            exit 1
+          }
+
+          order_id="$(jq -r '.id // empty' /tmp/order.json)"
+          server_total="$(jq -r '.totalAmount // empty' /tmp/order.json)"
+          test -n "$order_id"
+          test "$server_total" = "$TOTAL"
+
+          echo "order_id=$order_id" >> "$GITHUB_OUTPUT"
+
+      - name: Create Stripe test Checkout session
+        id: stripe
+        shell: bash
+        env:
+          TOKEN: ${{ steps.auth.outputs.token }}
+          ORDER_ID: ${{ steps.order.outputs.order_id }}
+        run: |
+          set -euo pipefail
+          stripe_payload="$(jq -n --arg orderId "$ORDER_ID" '{orderId:$orderId}')"
+          stripe_code="$(curl -sS -o /tmp/stripe.json -w '%{http_code}'             -X POST "$API_BASE_URL/api/payments/create-stripe-session"             -H 'Content-Type: application/json'             -H "Authorization: Bearer $TOKEN"             --data "$stripe_payload")"
+
+          test "$stripe_code" = "200" || {
+            echo "Stripe session failed: HTTP $stripe_code"
+            cat /tmp/stripe.json
+            exit 1
+          }
+
+          session_id="$(jq -r '.id // empty' /tmp/stripe.json)"
+          case "$session_id" in
+            cs_test_*) ;;
+            cs_live_*)
+              echo "Refusing live Stripe configuration in staging."
+              exit 1
+              ;;
+            *)
+              echo "Unexpected Stripe session id."
+              exit 1
+              ;;
+          esac
+
+          echo "stripe_mode=test" >> "$GITHUB_OUTPUT"
+
+      - name: Validate client RBAC and public settings
+        shell: bash
+        env:
+          TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          set -euo pipefail
+          settings_code="$(curl -sS -o /tmp/settings.json -w '%{http_code}' "$API_BASE_URL/api/settings")"
+          test "$settings_code" = "200"
+
+          admin_code="$(curl -sS -o /tmp/admin-stats.json -w '%{http_code}'             "$API_BASE_URL/api/admin/stats"             -H "Authorization: Bearer $TOKEN")"
+          test "$admin_code" = "403"
+
+      - name: Publish smoke summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## TKB Shop staging E2E smoke"
+            echo
+            echo "- Gateway bootstrap: checked"
+            echo "- Synthetic Auth register/login: checked"
+            echo "- Catalog recipe product: checked"
+            echo "- Orders server quote: checked"
+            echo "- Pending Stripe order: checked"
+            echo "- Stripe Checkout: test mode required"
+            echo "- Client/admin RBAC: checked"
+            echo
+            echo "Synthetic records are identified by email prefix `tkb-smoke-` and shipping address prefix `[RECETTE E2E]` for cleanup."
+          } >> "$GITHUB_STEP_SUMMARY"
