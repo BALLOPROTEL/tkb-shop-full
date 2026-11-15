@@ -10,11 +10,20 @@ from app.observability import get_request_id, install_observability
 app = FastAPI(title="TKB Shop API Gateway", version="1.1.0")
 install_observability(app, "gateway")
 
-CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
-ORDERS_SERVICE_URL = os.getenv("ORDERS_SERVICE_URL", "http://orders:8000").rstrip("/")
-PAYMENTS_SERVICE_URL = os.getenv("PAYMENTS_SERVICE_URL", "http://payments:8000").rstrip("/")
-BACKOFFICE_SERVICE_URL = os.getenv("BACKOFFICE_SERVICE_URL", "http://backoffice:8000").rstrip("/")
+
+def _service_url(name: str, default: str) -> str:
+    value = os.getenv(name, default).rstrip("/")
+    if "://" not in value:
+        value = f"https://{value}"
+    return value
+
+
+GATEWAY_SHARED_TOKEN = os.getenv("GATEWAY_SHARED_TOKEN")
+CATALOG_SERVICE_URL = _service_url("CATALOG_SERVICE_URL", "http://catalog:8000")
+AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
+ORDERS_SERVICE_URL = _service_url("ORDERS_SERVICE_URL", "http://orders:8000")
+PAYMENTS_SERVICE_URL = _service_url("PAYMENTS_SERVICE_URL", "http://payments:8000")
+BACKOFFICE_SERVICE_URL = _service_url("BACKOFFICE_SERVICE_URL", "http://backoffice:8000")
 
 READINESS_DEPENDENCIES = {
     "catalog": CATALOG_SERVICE_URL,
@@ -143,6 +152,8 @@ async def proxy(path: str, request: Request):
         if key.lower() not in {"host", "content-length"}
     }
     request_headers["x-request-id"] = request.state.request_id
+    if GATEWAY_SHARED_TOKEN:
+        request_headers["x-gateway-token"] = GATEWAY_SHARED_TOKEN
 
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
         upstream = await client.request(
