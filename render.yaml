@@ -51,6 +51,15 @@ projects:
                   type: web
                   name: tkb-backoffice-staging
                   envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: NOTIFICATIONS_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-notifications-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: UPSTREAM_WAKE_TIMEOUT_SECONDS
+                value: "150"
+              - key: UPSTREAM_WAKE_INTERVAL_SECONDS
+                value: "2"
 
           - type: web
             name: tkb-auth-staging
@@ -85,6 +94,10 @@ projects:
                   type: web
                   name: tkb-notifications-staging
                   envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: NOTIFICATIONS_WAKE_TIMEOUT_SECONDS
+                value: "150"
+              - key: NOTIFICATIONS_WAKE_INTERVAL_SECONDS
+                value: "2"
 
           - type: web
             name: tkb-catalog-staging

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { CartProvider } from './context/CartContext';
@@ -32,12 +32,71 @@ import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminNewsletter from './pages/admin/AdminNewsletter';
 import { getStoredAuth } from './utils/authStorage';
+import { ensureServicesReady } from './utils/serviceBootstrap';
 
 const ProtectedRoute = ({ children, isAdmin = false }) => {
   const { user, token } = getStoredAuth();
   if (!token || !user) return <Navigate to="/" replace />;
   if (isAdmin && user.role !== 'admin') return <Navigate to="/" replace />;
   return children;
+};
+
+const ServiceBootstrapGate = ({ children }) => {
+  const [status, setStatus] = useState('starting');
+  const [error, setError] = useState('');
+
+  const start = useCallback(() => {
+    setStatus('starting');
+    setError('');
+
+    ensureServicesReady()
+      .then(() => setStatus('ready'))
+      .catch((err) => {
+        setError(err?.message || "TKB Shop n'a pas pu demarrer correctement.");
+        setStatus('error');
+      });
+  }, []);
+
+  useEffect(() => {
+    start();
+  }, [start]);
+
+  if (status === 'ready') {
+    return children;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#07080d] flex items-center justify-center px-6">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white p-10 text-center shadow-2xl">
+        <div className="text-xs font-semibold tracking-[0.45em] text-slate-400">
+          TKB SHOP
+        </div>
+        <h1 className="mt-5 text-2xl font-semibold tracking-[0.12em] text-slate-900">
+          {status === 'error' ? 'DEMARRAGE INTERROMPU' : 'PREPARATION DE LA BOUTIQUE'}
+        </h1>
+        <p className="mt-4 text-sm leading-6 text-slate-500">
+          {status === 'error'
+            ? error
+            : "L'environnement de test redemarre ses services apres une periode d'inactivite. La boutique s'ouvrira automatiquement des qu'ils seront prets."}
+        </p>
+
+        {status === 'starting' ? (
+          <div className="mt-7 flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+            Initialisation
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={start}
+            className="mt-7 w-full bg-slate-950 px-5 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-slate-800"
+          >
+            Reessayer
+          </button>
+        )}
+      </div>
+    </div>
+  );
 };
 
 const AppContent = () => {
@@ -88,8 +147,10 @@ function App() {
       <FavoritesProvider>
         <CartProvider>
           <Toaster position="top-center" />
-          <ScrollToTop />
-          <AppContent />
+          <ServiceBootstrapGate>
+            <ScrollToTop />
+            <AppContent />
+          </ServiceBootstrapGate>
         </CartProvider>
       </FavoritesProvider>
     </Router>

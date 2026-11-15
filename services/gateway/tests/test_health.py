@@ -7,6 +7,8 @@ from app.main import (
     CATALOG_SERVICE_URL,
     ORDERS_SERVICE_URL,
     PAYMENTS_SERVICE_URL,
+    NOTIFICATIONS_SERVICE_URL,
+    READINESS_DEPENDENCIES,
     _target_for,
     app,
 )
@@ -36,7 +38,7 @@ def test_gateway_preserves_caller_request_id():
 
 
 def test_gateway_readiness_checks_dependencies(monkeypatch):
-    async def fake_get(self, url, headers=None):
+    async def fake_get(self, url, headers=None, timeout=None):
         assert headers["X-Request-ID"] == "ready-trace"
         return FakeResponse()
 
@@ -50,7 +52,7 @@ def test_gateway_readiness_checks_dependencies(monkeypatch):
 
 
 def test_gateway_readiness_fails_when_dependency_is_down(monkeypatch):
-    async def fake_get(self, url, headers=None):
+    async def fake_get(self, url, headers=None, timeout=None):
         status_code = 503 if "orders" in url else 200
         return FakeResponse(status_code=status_code)
 
@@ -61,6 +63,42 @@ def test_gateway_readiness_fails_when_dependency_is_down(monkeypatch):
     payload = response.json()
     assert payload["status"] == "not_ready"
     assert payload["dependencies"]["orders"] is False
+
+
+def test_gateway_readiness_includes_notifications():
+    assert READINESS_DEPENDENCIES["notifications"] == NOTIFICATIONS_SERVICE_URL
+
+
+def test_gateway_bootstrap_reports_warming_dependencies(monkeypatch):
+    calls = []
+
+    async def fake_get(self, url, headers=None, timeout=None):
+        calls.append(url)
+        status_code = 503 if url == f"{NOTIFICATIONS_SERVICE_URL}/ready" else 200
+        return FakeResponse(status_code=status_code)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    response = client.get("/api/system/bootstrap")
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "3"
+    payload = response.json()
+    assert payload["status"] == "warming"
+    assert payload["dependencies"]["notifications"] is False
+    assert len(calls) == len(READINESS_DEPENDENCIES)
+
+
+def test_gateway_bootstrap_returns_ready_when_every_service_is_ready(monkeypatch):
+    async def fake_get(self, url, headers=None, timeout=None):
+        return FakeResponse(status_code=200)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    response = client.get("/api/system/bootstrap")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert all(payload["dependencies"].values())
 
 
 def test_gateway_propagates_request_id_to_upstream(monkeypatch):

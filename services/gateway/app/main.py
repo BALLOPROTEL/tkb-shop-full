@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.observability import get_request_id, install_observability
 
-app = FastAPI(title="TKB Shop API Gateway", version="1.1.1")
+app = FastAPI(title="TKB Shop API Gateway", version="1.2.0")
 install_observability(app, "gateway")
 
 
@@ -21,7 +21,7 @@ def _service_url(name: str, default: str) -> str:
 
 
 GATEWAY_SHARED_TOKEN = os.getenv("GATEWAY_SHARED_TOKEN")
-UPSTREAM_WAKE_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_WAKE_TIMEOUT_SECONDS", "90"))
+UPSTREAM_WAKE_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_WAKE_TIMEOUT_SECONDS", "150"))
 UPSTREAM_WAKE_INTERVAL_SECONDS = float(os.getenv("UPSTREAM_WAKE_INTERVAL_SECONDS", "2"))
 TRANSIENT_UPSTREAM_STATUSES = {502, 503, 504}
 SAFE_RETRY_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -31,6 +31,10 @@ AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
 ORDERS_SERVICE_URL = _service_url("ORDERS_SERVICE_URL", "http://orders:8000")
 PAYMENTS_SERVICE_URL = _service_url("PAYMENTS_SERVICE_URL", "http://payments:8000")
 BACKOFFICE_SERVICE_URL = _service_url("BACKOFFICE_SERVICE_URL", "http://backoffice:8000")
+NOTIFICATIONS_SERVICE_URL = _service_url(
+    "NOTIFICATIONS_SERVICE_URL",
+    "http://notifications:8000",
+)
 
 READINESS_DEPENDENCIES = {
     "catalog": CATALOG_SERVICE_URL,
@@ -38,6 +42,7 @@ READINESS_DEPENDENCIES = {
     "orders": ORDERS_SERVICE_URL,
     "payments": PAYMENTS_SERVICE_URL,
     "backoffice": BACKOFFICE_SERVICE_URL,
+    "notifications": NOTIFICATIONS_SERVICE_URL,
 }
 
 origins = [
@@ -64,6 +69,22 @@ HOP_BY_HOP_RESPONSE_HEADERS = {
     "transfer-encoding",
     "upgrade",
 }
+
+
+async def _probe_dependency(
+    client: httpx.AsyncClient,
+    base_url: str,
+    request_id: str,
+) -> bool:
+    try:
+        response = await client.get(
+            f"{base_url}/ready",
+            headers={"X-Request-ID": request_id},
+            timeout=5.0,
+        )
+        return response.status_code == 200
+    except httpx.HTTPError:
+        return False
 
 
 async def _wait_for_upstream_ready(
@@ -136,22 +157,25 @@ def health():
     return {"service": "gateway", "status": "ok"}
 
 
+async def _dependency_statuses(request_id: str) -> dict[str, bool]:
+    async with httpx.AsyncClient(timeout=6.0, follow_redirects=False) as client:
+        names = list(READINESS_DEPENDENCIES)
+        checks = await asyncio.gather(
+            *[
+                _probe_dependency(
+                    client,
+                    READINESS_DEPENDENCIES[name],
+                    request_id,
+                )
+                for name in names
+            ]
+        )
+    return dict(zip(names, checks))
+
+
 @app.get("/ready")
 async def readiness():
-    request_id = get_request_id() or ""
-    dependencies: dict[str, bool] = {}
-
-    async with httpx.AsyncClient(timeout=2.0, follow_redirects=False) as client:
-        for name, base_url in READINESS_DEPENDENCIES.items():
-            try:
-                response = await client.get(
-                    f"{base_url}/ready",
-                    headers={"X-Request-ID": request_id},
-                )
-                dependencies[name] = response.status_code == 200
-            except httpx.HTTPError:
-                dependencies[name] = False
-
+    dependencies = await _dependency_statuses(get_request_id() or "")
     ready = all(dependencies.values())
     return JSONResponse(
         status_code=200 if ready else 503,
@@ -160,6 +184,21 @@ async def readiness():
             "status": "ready" if ready else "not_ready",
             "dependencies": dependencies,
         },
+    )
+
+
+@app.get("/api/system/bootstrap")
+async def bootstrap_services():
+    dependencies = await _dependency_statuses(get_request_id() or "")
+    ready = all(dependencies.values())
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={
+            "service": "gateway",
+            "status": "ready" if ready else "warming",
+            "dependencies": dependencies,
+        },
+        headers={"retry-after": "3"} if not ready else None,
     )
 
 
