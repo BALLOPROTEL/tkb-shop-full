@@ -167,3 +167,96 @@ def test_gateway_overrides_client_gateway_token(monkeypatch):
     )
 
     assert response.status_code == 200
+
+
+def test_mutating_request_waits_for_service_before_forwarding(monkeypatch):
+    calls = {"ready": 0, "request": 0}
+
+    async def fake_get(self, url, headers=None, timeout=None):
+        calls["ready"] += 1
+        assert url == f"{AUTH_SERVICE_URL}/ready"
+        return FakeResponse(status_code=200)
+
+    async def fake_request(
+        self,
+        method,
+        url,
+        params=None,
+        content=None,
+        headers=None,
+    ):
+        calls["request"] += 1
+        assert method == "POST"
+        assert url == f"{AUTH_SERVICE_URL}/api/auth/register"
+        return FakeResponse(status_code=200, content=b'{"success":true}')
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "name": "Cold Start Test",
+            "email": "cold-start@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert calls == {"ready": 1, "request": 1}
+
+
+def test_mutating_request_is_not_forwarded_until_service_is_ready(monkeypatch):
+    import app.main as service_main
+
+    async def fake_wait(client, base_url, request_id):
+        return False
+
+    async def unexpected_request(*args, **kwargs):
+        raise AssertionError("Mutating request must not be forwarded while upstream is asleep")
+
+    monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
+    monkeypatch.setattr(httpx.AsyncClient, "request", unexpected_request)
+
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "name": "Cold Start Test",
+            "email": "cold-start@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
+    assert response.headers["x-tkb-route"] == "auth"
+
+
+def test_safe_request_retries_once_after_transient_upstream_response(monkeypatch):
+    import app.main as service_main
+
+    calls = {"request": 0}
+
+    async def fake_wait(client, base_url, request_id):
+        return True
+
+    async def fake_request(
+        self,
+        method,
+        url,
+        params=None,
+        content=None,
+        headers=None,
+    ):
+        calls["request"] += 1
+        if calls["request"] == 1:
+            return FakeResponse(status_code=503, content=b'{"detail":"waking"}')
+        return FakeResponse(status_code=200, content=b"[]")
+
+    monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
+    monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+
+    response = client.get("/api/products")
+
+    assert response.status_code == 200
+    assert calls["request"] == 2
