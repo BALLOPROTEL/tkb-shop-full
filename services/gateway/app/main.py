@@ -1,4 +1,6 @@
+import asyncio
 import os
+import time
 
 import httpx
 from fastapi import FastAPI, Request, Response
@@ -7,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.observability import get_request_id, install_observability
 
-app = FastAPI(title="TKB Shop API Gateway", version="1.1.0")
+app = FastAPI(title="TKB Shop API Gateway", version="1.1.1")
 install_observability(app, "gateway")
 
 
@@ -19,6 +21,11 @@ def _service_url(name: str, default: str) -> str:
 
 
 GATEWAY_SHARED_TOKEN = os.getenv("GATEWAY_SHARED_TOKEN")
+UPSTREAM_WAKE_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_WAKE_TIMEOUT_SECONDS", "90"))
+UPSTREAM_WAKE_INTERVAL_SECONDS = float(os.getenv("UPSTREAM_WAKE_INTERVAL_SECONDS", "2"))
+TRANSIENT_UPSTREAM_STATUSES = {502, 503, 504}
+SAFE_RETRY_METHODS = {"GET", "HEAD", "OPTIONS"}
+MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 CATALOG_SERVICE_URL = _service_url("CATALOG_SERVICE_URL", "http://catalog:8000")
 AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
 ORDERS_SERVICE_URL = _service_url("ORDERS_SERVICE_URL", "http://orders:8000")
@@ -57,6 +64,31 @@ HOP_BY_HOP_RESPONSE_HEADERS = {
     "transfer-encoding",
     "upgrade",
 }
+
+
+async def _wait_for_upstream_ready(
+    client: httpx.AsyncClient,
+    base_url: str,
+    request_id: str,
+) -> bool:
+    deadline = time.monotonic() + UPSTREAM_WAKE_TIMEOUT_SECONDS
+
+    while True:
+        try:
+            response = await client.get(
+                f"{base_url}/ready",
+                headers={"X-Request-ID": request_id},
+                timeout=5.0,
+            )
+            if response.status_code == 200:
+                return True
+        except httpx.HTTPError:
+            pass
+
+        if time.monotonic() >= deadline:
+            return False
+
+        await asyncio.sleep(UPSTREAM_WAKE_INTERVAL_SECONDS)
 
 
 def _target_for(path: str) -> tuple[str | None, str]:
@@ -155,14 +187,85 @@ async def proxy(path: str, request: Request):
     if GATEWAY_SHARED_TOKEN:
         request_headers["x-gateway-token"] = GATEWAY_SHARED_TOKEN
 
+    request_body = await request.body()
+
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
-        upstream = await client.request(
-            request.method,
-            target_url,
-            params=request.query_params,
-            content=await request.body(),
-            headers=request_headers,
-        )
+        if request.method in MUTATING_METHODS:
+            ready = await _wait_for_upstream_ready(
+                client,
+                base_url,
+                request.state.request_id,
+            )
+            if not ready:
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": (
+                            f"Service {routed_service} en cours de demarrage. "
+                            "Reessayez dans quelques instants."
+                        )
+                    },
+                    headers={"x-tkb-route": routed_service, "retry-after": "5"},
+                )
+
+        try:
+            upstream = await client.request(
+                request.method,
+                target_url,
+                params=request.query_params,
+                content=request_body,
+                headers=request_headers,
+            )
+        except httpx.HTTPError:
+            if request.method not in SAFE_RETRY_METHODS:
+                return JSONResponse(
+                    status_code=502,
+                    content={"detail": f"Service {routed_service} indisponible"},
+                    headers={"x-tkb-route": routed_service, "retry-after": "5"},
+                )
+
+            ready = await _wait_for_upstream_ready(
+                client,
+                base_url,
+                request.state.request_id,
+            )
+            if not ready:
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": (
+                            f"Service {routed_service} en cours de demarrage. "
+                            "Reessayez dans quelques instants."
+                        )
+                    },
+                    headers={"x-tkb-route": routed_service, "retry-after": "5"},
+                )
+
+            upstream = await client.request(
+                request.method,
+                target_url,
+                params=request.query_params,
+                content=request_body,
+                headers=request_headers,
+            )
+
+        if (
+            request.method in SAFE_RETRY_METHODS
+            and upstream.status_code in TRANSIENT_UPSTREAM_STATUSES
+        ):
+            ready = await _wait_for_upstream_ready(
+                client,
+                base_url,
+                request.state.request_id,
+            )
+            if ready:
+                upstream = await client.request(
+                    request.method,
+                    target_url,
+                    params=request.query_params,
+                    content=request_body,
+                    headers=request_headers,
+                )
 
     response_headers = {
         key: value
