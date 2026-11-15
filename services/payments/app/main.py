@@ -8,6 +8,7 @@ import urllib.request
 import httpx
 import stripe
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 
@@ -16,9 +17,18 @@ from app.observability import get_request_id, install_observability
 app = FastAPI(title="TKB Shop Payments Service", version="0.2.0")
 install_observability(app, "payments")
 
+
+def _service_url(name: str, default: str) -> str:
+    value = os.getenv(name, default).rstrip("/")
+    if "://" not in value:
+        value = f"https://{value}"
+    return value
+
+
+GATEWAY_SHARED_TOKEN = os.getenv("GATEWAY_SHARED_TOKEN")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
-ORDERS_SERVICE_URL = os.getenv("ORDERS_SERVICE_URL", "http://orders:8000").rstrip("/")
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
+ORDERS_SERVICE_URL = _service_url("ORDERS_SERVICE_URL", "http://orders:8000")
+AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173").rstrip("/")
 
 STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "eur")
@@ -32,6 +42,14 @@ PAYPAL_CURRENCY = os.getenv("PAYPAL_CURRENCY", "EUR")
 PAYPAL_FX_RATE = float(os.getenv("PAYPAL_FX_RATE", "655"))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+@app.middleware("http")
+async def require_gateway_for_public_api(request: Request, call_next):
+    if GATEWAY_SHARED_TOKEN and request.url.path.startswith("/api/"):
+        if request.headers.get("x-gateway-token") != GATEWAY_SHARED_TOKEN:
+            return JSONResponse(status_code=403, content={"detail": "Gateway requis"})
+    return await call_next(request)
 
 
 class PayPalVerifyRequest(BaseModel):
