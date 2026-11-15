@@ -4,7 +4,13 @@ os.environ.setdefault("INTERNAL_SERVICE_TOKEN", "test-internal-token")
 
 from fastapi.testclient import TestClient
 
-from app.main import _paypal_base_url, app
+from app.main import (
+    STRIPE_AMOUNT_MULTIPLIER,
+    STRIPE_CURRENCY,
+    _paypal_base_url,
+    _stripe_unit_amount,
+    app,
+)
 
 
 client = TestClient(app)
@@ -26,6 +32,12 @@ def test_internal_paypal_endpoint_rejects_missing_internal_token():
 
 def test_paypal_defaults_to_sandbox():
     assert "sandbox.paypal.com" in _paypal_base_url()
+
+
+def test_stripe_uses_xof_zero_decimal_amounts():
+    assert STRIPE_CURRENCY == "xof"
+    assert STRIPE_AMOUNT_MULTIPLIER == 1
+    assert _stripe_unit_amount(50000) == 50000
 
 
 def test_payments_source_has_no_mongo_persistence_access():
