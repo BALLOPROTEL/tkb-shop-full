@@ -52,3 +52,11 @@ def test_catalog_does_not_access_users_collection_directly():
     source = inspect.getsource(catalog_main)
     assert "db.users" not in source
     assert "/internal/auth/validate" in source
+
+
+def test_public_api_requires_gateway_token_when_configured(monkeypatch):
+    import app.main as service_main
+
+    monkeypatch.setattr(service_main, "GATEWAY_SHARED_TOKEN", "trusted-gateway-token")
+    response = client.get("/api/products")
+    assert response.status_code == 403
