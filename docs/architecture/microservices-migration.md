@@ -1,177 +1,152 @@
-# TKB Shop - Microservices migration
+# TKB Shop — Microservices architecture
 
 ## Goal
 
-Migrate the current FastAPI monolith without breaking the React frontend or production data.
+TKB Shop has completed its migration from a FastAPI monolith to a microservices runtime while preserving the frontend `/api/*` contract.
 
-## Strategy: strangler pattern
-
-The frontend keeps one API base URL. The API Gateway receives every `/api/*` request and routes each bounded context to its owner.
-
-### Current routing
+## Runtime topology
 
 ```text
-React frontend
-     |
-     v
+React / Vite frontend
+        |
+        v
 API Gateway :8000
-     |
-     +---- /api/products* --------------------------> Catalog
-     |
-     +---- /api/auth/*
-     +---- /api/users/me
-     +---- /api/admin/invites* ---------------------> Auth
-     |
-     +---- /api/orders*\n     +---- /api/admin/orders --------------------------> Orders\n     |\n     +---- /api/payments* ---------------------------> Payments\n     |       |\n     |       +---- internal payment completed ---------> Orders\n     |\n     +---- Auth ---- internal email -----------------> Notifications\n     |\n     +---- /api/settings\n     +---- /api/newsletter\n     +---- /api/admin/newsletter\n     +---- /api/admin/stats --------------------------> Backoffice\n     |\n     +---- unknown /api/* ----------------------------> 404
+        |
+        +--> Catalog ---------> tkb_catalog
+        |
+        +--> Auth ------------> tkb_auth
+        |
+        +--> Orders ----------> tkb_orders
+        |      |
+        |      +--> Auth
+        |      +--> Catalog
+        |
+        +--> Payments
+        |      |
+        |      +--> Auth
+        |      +--> Orders
+        |
+        +--> Notifications
+        |
+        +--> Backoffice ------> tkb_backoffice
+               |
+               +--> Auth
+               +--> Catalog
+               +--> Orders
 ```
 
-### Completed
+Only the Gateway is intended to be public in the backend topology. Unknown `/api/*` routes return 404; the legacy FastAPI application is no longer part of the microservices runtime.
 
-- API Gateway introduced.
-- Catalog service extracted.
-- Auth / Users service extracted.
-- Legacy backend containerized.
-- Shared MongoDB intentionally retained during the strangler phase.
-- CI validates frontend build, Python syntax and service tests.
-- insecure hard-coded JWT fallback removed.
+## Service ownership
 
-## Target bounded contexts
+### Gateway
+Owns public routing, request correlation and aggregated readiness.
 
-### Auth service
-Owns users, login, JWT issuance, profile, password reset and admin invitations.
+### Auth
+Owns users, login, JWT issuance and validation, profile, password reset, admin invitations and administrative user operations.
 
-### Catalog service
-Owns products, categories, stock-read model and product administration.
+Auth is the exclusive owner of `JWT_SECRET`. Catalog, Orders, Payments and Backoffice delegate identity validation to the protected `POST /internal/auth/validate` contract.
 
-### Orders service
-Will own quote validation, order creation, order lifecycle and order history.
+### Catalog
+Owns products, pricing, stock and product administration.
 
-### Payments service
-Will own Stripe and PayPal integrations, webhook verification and payment state.
+Internal contracts include:
+- `POST /internal/catalog/quote`
+- `POST /internal/catalog/stock/commit`
+- `GET /internal/catalog/stats`
 
-### Notifications service
-Will own transactional email and asynchronous notifications. Auth still sends its email directly until this extraction.
+Catalog owns stock mutation and its idempotency ledger.
 
-### Backoffice service
-Owns global site settings, newsletter subscriptions/listing and administrative aggregate statistics.
+### Orders
+Owns quote orchestration, order creation, lifecycle, history and order statistics.
 
-## Data migration target
+Orders obtains identity from Auth and authoritative product/stock information from Catalog. It does not access Auth or Catalog persistence directly.
 
-The current shared MongoDB is transitional, not the target architecture.
+### Payments
+Owns Stripe/PayPal integrations, webhook verification and payment orchestration.
 
-For each domain:
-1. move route ownership,
-2. stabilize API contract,
-3. add tests,
-4. move collection/database ownership,
-5. disable equivalent legacy route,
-6. preserve a rollback path.
+Payments is persistence-stateless in the application database layer. It validates callers through Auth and obtains order checkout context through Orders.
 
-## Events
+### Notifications
+Owns transactional SMTP email delivery and is called through protected internal service contracts.
 
-After Orders and Payments are extracted, introduce a broker only for valuable asynchronous flows. Candidate events:
+### Backoffice
+Owns settings and newsletter persistence. Administrative aggregate statistics are composed through Auth, Catalog and Orders internal APIs rather than cross-domain database reads.
 
-- `order.created`
-- `payment.completed`
-- `order.status.changed`
-- `stock.changed`
-- `user.registered`
+## Data ownership
 
-Do not add a broker merely to make the architecture look distributed.
+Stateful bounded contexts use separate logical MongoDB databases:
 
-## Security rules
+- Auth: `tkb_auth`
+- Catalog: `tkb_catalog`
+- Orders: `tkb_orders`
+- Backoffice: `tkb_backoffice`
 
-- no hard-coded JWT fallback secret,
-- secrets from environment/platform secret stores,
-- only the Gateway public in the final topology,
-- service-to-service authentication before final production cutover,
-- payment webhook signature verification is mandatory.
+The shared `protel_shop` database is legacy source data only and is not used by the microservices runtime.
 
-## Definition of done for each extraction
+The migration script `scripts/migrate_shared_mongo_to_service_dbs.js` performs idempotent upserts by `_id` and intentionally leaves the source database untouched for rollback.
 
-- frontend contract unchanged or versioned,
-- health endpoint,
-- unit/API smoke tests,
-- CI green,
-- Gateway routes the bounded context,
-- legacy implementation can be disabled without regression,
-- rollback path documented.
+Recommended production cutover:
 
+1. create a `mongodump`;
+2. run the migration;
+3. compare collection/document counts;
+4. run the full microservices certification;
+5. configure the service-specific database names;
+6. retain the source database until the rollback window closes.
 
-## Phase 2 - Catalog data ownership
+## Service-to-service security
 
-Orders no longer reads or mutates the Catalog `products` collection directly.
+Internal endpoints require `INTERNAL_SERVICE_TOKEN`.
 
-Internal contracts:
-- `POST /internal/catalog/quote` for authoritative pricing and stock validation.
-- `POST /internal/catalog/stock/commit` for token-protected idempotent stock decrements.
+Application JWTs are issued and decoded only by Auth. Other services never need the JWT signing secret.
 
-Catalog owns the idempotency ledger for stock commits. Orders now depends on Catalog's service contract rather than Catalog persistence.
+Payment webhook signature verification remains mandatory.
 
+## Observability and resilience
 
-## Phase 2 - Payments and Backoffice data ownership
+Every HTTP request has a correlation identifier:
 
-Payments no longer reads MongoDB user/order collections. It validates the caller JWT locally and obtains the authorized checkout context from Orders through a protected internal contract.
+- Gateway accepts or generates `X-Request-ID`;
+- the same identifier is returned to the client;
+- downstream calls propagate it;
+- services write structured JSON access logs with service, request_id, method, path, status and duration.
 
-Backoffice keeps only its own settings/newsletter persistence. Administrative statistics are composed from Auth, Catalog and Orders internal stats endpoints, and admin authorization is validated through Auth.
+Health semantics:
 
-This removes direct cross-domain collection access from Payments and Backoffice.
+- `/_health`: liveness;
+- `/ready`: readiness;
+- Mongo-backed services verify database connectivity;
+- Gateway aggregates readiness of its direct dependencies.
 
+## CI and certification
 
-## Phase 3 - Observability and resilience
+CI contains ten required checks:
 
-Every HTTP request now has a correlation identifier.
+- Frontend build
+- Python syntax
+- Gateway tests
+- Catalog tests
+- Auth tests
+- Orders tests
+- Payments tests
+- Notifications tests
+- Backoffice tests
+- Microservices certification
 
-- Gateway accepts an incoming `X-Request-ID` or generates one.
-- The same identifier is forwarded to downstream services.
-- Auth, Orders, Payments and Backoffice propagate it on internal HTTP calls.
-- Every service writes a structured JSON access log containing service, request_id, method, path, status and duration_ms.
-- Every response returns `X-Request-ID`.
+The Docker certification validates the assembled stack through the Gateway and verifies service/database boundaries.
 
-Health semantics are separated:
+## Migration result
 
-- `/_health`: liveness — the process is running.
-- `/ready`: readiness — the service is ready to serve traffic; Mongo-backed services verify database connectivity.
+The strangler migration is complete:
 
-The full Docker certification validates both liveness and readiness before running the business flow.
+- all business routes are owned by microservices;
+- legacy runtime fallback is removed;
+- cross-domain collection access is removed;
+- stateful domains are physically separated into logical databases;
+- Auth is the sole JWT authority;
+- internal contracts are token-protected;
+- liveness, readiness and request correlation are implemented;
+- the complete stack is CI-certified.
 
-
-## Phase 2 - Auth data ownership
-
-Auth is now the only service that accesses the `users` collection.
-
-- Catalog delegates administrator identity validation to `POST /internal/auth/validate`.
-- Orders delegates customer/admin identity validation to Auth.
-- Orders admin listings rely on the user snapshot stored on the order rather than reading Auth persistence.
-- Catalog and Orders no longer require JWT signing secrets; they treat Auth as the identity authority.
-
-This removes direct cross-domain access to Auth persistence.
-
-
-## Phase 2 - Physical Mongo isolation
-
-Stateful bounded contexts now use separate logical Mongo databases:
-
-- `tkb_auth`
-- `tkb_catalog`
-- `tkb_orders`
-- `tkb_backoffice`
-
-The migration script `scripts/migrate_shared_mongo_to_service_dbs.js` copies existing documents by `_id` with idempotent upserts. It intentionally leaves the legacy source database untouched to preserve a rollback path.
-
-Production cutover procedure:
-1. create a `mongodump`,
-2. run the migration,
-3. compare collection counts,
-4. run microservices certification,
-5. switch service DB environment variables,
-6. retain the source DB until the rollback window closes.
-
-
-## Phase 2 - Exclusive identity secret ownership
-
-Auth is the only service that owns `JWT_SECRET` and decodes application access tokens.
-
-Catalog, Orders, Payments and Backoffice delegate user validation to Auth through the protected internal `/internal/auth/validate` contract.
-
-The end-to-end certification also inspects Mongo collection boundaries and fails if a service database contains foreign domain collections or if the legacy `protel_shop` database is used by the microservices runtime.
+Production deployment of the distributed backend remains an environment/platform operation rather than an architecture migration task.
