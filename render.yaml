@@ -25,7 +25,7 @@ projects:
               - key: GATEWAY_SHARED_TOKEN
                 generateValue: true
               - key: CORS_ORIGINS
-                value: https://tkb-shop-full.vercel.app
+                value: https://tkb-shop.vercel.app,https://tkb-shop-protels-projects.vercel.app,https://tkb-shop-git-main-protels-projects.vercel.app
               - key: CATALOG_SERVICE_URL
                 fromService:
                   type: web
@@ -79,7 +79,7 @@ projects:
               - key: MONGO_DB_NAME
                 value: tkb_auth
               - key: CLIENT_URL
-                value: https://tkb-shop-full.vercel.app
+                value: https://tkb-shop.vercel.app
               - key: NOTIFICATIONS_SERVICE_URL
                 fromService:
                   type: web
@@ -192,7 +192,7 @@ projects:
                   name: tkb-auth-staging
                   envVarKey: INTERNAL_SERVICE_TOKEN
               - key: CLIENT_URL
-                value: https://tkb-shop-full.vercel.app
+                value: https://tkb-shop.vercel.app
               - key: AUTH_SERVICE_URL
                 fromService:
                   type: web
