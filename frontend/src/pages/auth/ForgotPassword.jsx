@@ -7,16 +7,28 @@ import api from '../../api';
 const ForgotPassword = () => {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
+    const [sent, setSent] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setSent(false);
         try {
             await api.post('/api/auth/forgot-password', { email });
+            setSent(true);
             toast.success("Si ce compte existe, un lien de reinitialisation a ete envoye.");
         } catch (err) {
-            const errorMsg = err.response?.data?.detail || "Erreur de reinitialisation";
-            toast.error(errorMsg);
+            const detail = err.response?.data?.detail;
+            const safeDetail =
+                typeof detail === 'string' &&
+                detail.length <= 240 &&
+                !/<\/?(?:html|head|body|style)|<!doctype/i.test(detail);
+
+            toast.error(
+                safeDetail
+                    ? detail
+                    : "Le service de reinitialisation est temporairement indisponible. Reessayez dans quelques instants."
+            );
         } finally {
             setLoading(false);
         }
@@ -71,7 +83,9 @@ const ForgotPassword = () => {
                             <Sparkles size={12} /> Consultez votre email
                         </div>
                         <p className="mt-2">
-                            Nous vous avons envoye un lien de reinitialisation si ce compte existe.
+                            {sent
+                                ? "Si ce compte existe, un lien de reinitialisation vient d'etre envoye."
+                                : "Apres votre demande, vous recevrez ici une confirmation d'envoi."}
                         </p>
                     </div>
                 </div>
