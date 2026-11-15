@@ -12,6 +12,7 @@ from email.message import EmailMessage
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -23,6 +24,15 @@ from app.observability import get_request_id, install_observability
 app = FastAPI(title="TKB Shop Auth Service", version="0.1.0")
 install_observability(app, "auth")
 
+
+def _service_url(name: str, default: str) -> str:
+    value = os.getenv(name, default).rstrip("/")
+    if "://" not in value:
+        value = f"https://{value}"
+    return value
+
+
+GATEWAY_SHARED_TOKEN = os.getenv("GATEWAY_SHARED_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tkb_auth")
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -34,12 +44,21 @@ ADMIN_INVITE_EXPIRE_MINUTES = int(os.getenv("ADMIN_INVITE_EXPIRE_MINUTES", "5"))
 
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173").rstrip("/")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
-NOTIFICATIONS_SERVICE_URL = os.getenv("NOTIFICATIONS_SERVICE_URL", "http://notifications:8000").rstrip("/")
+NOTIFICATIONS_SERVICE_URL = _service_url("NOTIFICATIONS_SERVICE_URL", "http://notifications:8000")
 
 RESET_RATE_LIMIT_WINDOW_SEC = int(os.getenv("RESET_RATE_LIMIT_WINDOW_SEC", "600"))
 RESET_RATE_LIMIT_MAX = int(os.getenv("RESET_RATE_LIMIT_MAX", "5"))
 ADMIN_INVITE_RATE_LIMIT_WINDOW_SEC = int(os.getenv("ADMIN_INVITE_RATE_LIMIT_WINDOW_SEC", "600"))
 ADMIN_INVITE_RATE_LIMIT_MAX = int(os.getenv("ADMIN_INVITE_RATE_LIMIT_MAX", "5"))
+
+
+@app.middleware("http")
+async def require_gateway_for_public_api(request: Request, call_next):
+    if GATEWAY_SHARED_TOKEN and request.url.path.startswith("/api/"):
+        if request.headers.get("x-gateway-token") != GATEWAY_SHARED_TOKEN:
+            return JSONResponse(status_code=403, content={"detail": "Gateway requis"})
+    return await call_next(request)
+
 
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database(MONGO_DB_NAME)
