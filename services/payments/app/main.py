@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from app.observability import get_request_id, install_observability
 
-app = FastAPI(title="TKB Shop Payments Service", version="0.2.0")
+app = FastAPI(title="TKB Shop Payments Service", version="0.2.1")
 install_observability(app, "payments")
 
 
@@ -31,8 +31,13 @@ ORDERS_SERVICE_URL = _service_url("ORDERS_SERVICE_URL", "http://orders:8000")
 AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
 CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:5173").rstrip("/")
 
-STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "eur")
-STRIPE_AMOUNT_MULTIPLIER = int(os.getenv("STRIPE_AMOUNT_MULTIPLIER", "100"))
+STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "xof").lower()
+STRIPE_AMOUNT_MULTIPLIER = int(os.getenv("STRIPE_AMOUNT_MULTIPLIER", "1"))
+if STRIPE_CURRENCY == "xof" and STRIPE_AMOUNT_MULTIPLIER != 1:
+    raise RuntimeError(
+        "Configuration Stripe invalide: XOF est une devise a zero decimale "
+        "et STRIPE_AMOUNT_MULTIPLIER doit valoir 1"
+    )
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID")
@@ -93,6 +98,11 @@ def _internal_post(url: str, payload: dict) -> dict:
             detail = response.text
         raise HTTPException(response.status_code, detail or "Erreur service interne")
     return response.json()
+
+
+def _stripe_unit_amount(price: float) -> int:
+    """Return Stripe's integer amount for the configured presentment currency."""
+    return int(round(float(price) * STRIPE_AMOUNT_MULTIPLIER))
 
 
 def _paypal_base_url() -> str:
@@ -204,7 +214,7 @@ def create_stripe_session(data: dict, user: dict = Depends(get_current_user)):
 
     line_items = []
     for item in items:
-        unit_amount = int(round(float(item.get("price", 0)) * STRIPE_AMOUNT_MULTIPLIER))
+        unit_amount = _stripe_unit_amount(item.get("price", 0))
         line_items.append(
             {
                 "price_data": {
