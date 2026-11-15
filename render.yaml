@@ -1,0 +1,282 @@
+version: "1"
+
+projects:
+  - name: TKB-Shop
+    environments:
+      - name: staging
+        networking:
+          isolation: disabled
+        permissions:
+          protection: enabled
+        services:
+          - type: web
+            name: tkb-gateway-staging
+            runtime: python
+            plan: free
+            region: frankfurt
+            rootDir: services/gateway
+            buildCommand: pip install -r requirements.txt
+            startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+            healthCheckPath: /_health
+            autoDeployTrigger: checksPass
+            previews:
+              generation: off
+            envVars:
+              - key: GATEWAY_SHARED_TOKEN
+                generateValue: true
+              - key: CORS_ORIGINS
+                value: https://tkb-shop-full.vercel.app
+              - key: CATALOG_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-catalog-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: AUTH_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: ORDERS_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-orders-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: PAYMENTS_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-payments-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: BACKOFFICE_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-backoffice-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+
+          - type: web
+            name: tkb-auth-staging
+            runtime: python
+            plan: free
+            region: frankfurt
+            rootDir: services/auth
+            buildCommand: pip install -r requirements.txt
+            startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+            healthCheckPath: /_health
+            autoDeployTrigger: checksPass
+            previews:
+              generation: off
+            envVars:
+              - key: GATEWAY_SHARED_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-gateway-staging
+                  envVarKey: GATEWAY_SHARED_TOKEN
+              - key: INTERNAL_SERVICE_TOKEN
+                generateValue: true
+              - key: JWT_SECRET
+                generateValue: true
+              - key: MONGO_URI
+                sync: false
+              - key: MONGO_DB_NAME
+                value: tkb_auth
+              - key: CLIENT_URL
+                value: https://tkb-shop-full.vercel.app
+              - key: NOTIFICATIONS_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-notifications-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+
+          - type: web
+            name: tkb-catalog-staging
+            runtime: python
+            plan: free
+            region: frankfurt
+            rootDir: services/catalog
+            buildCommand: pip install -r requirements.txt
+            startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+            healthCheckPath: /_health
+            autoDeployTrigger: checksPass
+            previews:
+              generation: off
+            envVars:
+              - key: GATEWAY_SHARED_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-gateway-staging
+                  envVarKey: GATEWAY_SHARED_TOKEN
+              - key: INTERNAL_SERVICE_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: INTERNAL_SERVICE_TOKEN
+              - key: MONGO_URI
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: MONGO_URI
+              - key: MONGO_DB_NAME
+                value: tkb_catalog
+              - key: AUTH_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+
+          - type: web
+            name: tkb-orders-staging
+            runtime: python
+            plan: free
+            region: frankfurt
+            rootDir: services/orders
+            buildCommand: pip install -r requirements.txt
+            startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+            healthCheckPath: /_health
+            autoDeployTrigger: checksPass
+            previews:
+              generation: off
+            envVars:
+              - key: GATEWAY_SHARED_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-gateway-staging
+                  envVarKey: GATEWAY_SHARED_TOKEN
+              - key: INTERNAL_SERVICE_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: INTERNAL_SERVICE_TOKEN
+              - key: MONGO_URI
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: MONGO_URI
+              - key: MONGO_DB_NAME
+                value: tkb_orders
+              - key: AUTH_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: CATALOG_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-catalog-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: PAYMENTS_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-payments-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+
+          - type: web
+            name: tkb-payments-staging
+            runtime: python
+            plan: free
+            region: frankfurt
+            rootDir: services/payments
+            buildCommand: pip install -r requirements.txt
+            startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+            healthCheckPath: /_health
+            autoDeployTrigger: checksPass
+            previews:
+              generation: off
+            envVars:
+              - key: GATEWAY_SHARED_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-gateway-staging
+                  envVarKey: GATEWAY_SHARED_TOKEN
+              - key: INTERNAL_SERVICE_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: INTERNAL_SERVICE_TOKEN
+              - key: CLIENT_URL
+                value: https://tkb-shop-full.vercel.app
+              - key: AUTH_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: ORDERS_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-orders-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: STRIPE_CURRENCY
+                value: eur
+              - key: STRIPE_AMOUNT_MULTIPLIER
+                value: "100"
+              - key: PAYPAL_ENV
+                value: sandbox
+              - key: PAYPAL_CURRENCY
+                value: EUR
+              - key: PAYPAL_FX_RATE
+                value: "655"
+
+          - type: web
+            name: tkb-notifications-staging
+            runtime: python
+            plan: free
+            region: frankfurt
+            rootDir: services/notifications
+            buildCommand: pip install -r requirements.txt
+            startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+            healthCheckPath: /_health
+            autoDeployTrigger: checksPass
+            previews:
+              generation: off
+            envVars:
+              - key: INTERNAL_SERVICE_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: INTERNAL_SERVICE_TOKEN
+              - key: SMTP_PORT
+                value: "587"
+
+          - type: web
+            name: tkb-backoffice-staging
+            runtime: python
+            plan: free
+            region: frankfurt
+            rootDir: services/backoffice
+            buildCommand: pip install -r requirements.txt
+            startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+            healthCheckPath: /_health
+            autoDeployTrigger: checksPass
+            previews:
+              generation: off
+            envVars:
+              - key: GATEWAY_SHARED_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-gateway-staging
+                  envVarKey: GATEWAY_SHARED_TOKEN
+              - key: INTERNAL_SERVICE_TOKEN
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: INTERNAL_SERVICE_TOKEN
+              - key: MONGO_URI
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: MONGO_URI
+              - key: MONGO_DB_NAME
+                value: tkb_backoffice
+              - key: AUTH_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-auth-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: CATALOG_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-catalog-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
+              - key: ORDERS_SERVICE_URL
+                fromService:
+                  type: web
+                  name: tkb-orders-staging
+                  envVarKey: RENDER_EXTERNAL_HOSTNAME
