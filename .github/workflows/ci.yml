@@ -168,4 +168,8 @@ jobs:
           INTERNAL_SERVICE_TOKEN: ci-internal-secret-change-me
           CORS_ORIGINS: http://localhost:5173
           CLIENT_URL: http://localhost:5173
+          SMTP_HOST: smtp.example.invalid
+          SMTP_USER: ci-notifications@example.com
+          SMTP_PASS: ci-smtp-password
+          SMTP_FROM: TKB Shop CI <ci-notifications@example.com>
         run: python scripts/certify_microservices.py
