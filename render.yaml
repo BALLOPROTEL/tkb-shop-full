@@ -217,9 +217,9 @@ projects:
                   name: tkb-orders-staging
                   envVarKey: RENDER_EXTERNAL_HOSTNAME
               - key: STRIPE_CURRENCY
-                value: eur
+                value: xof
               - key: STRIPE_AMOUNT_MULTIPLIER
-                value: "100"
+                value: "1"
               - key: PAYPAL_ENV
                 value: sandbox
               - key: PAYPAL_CURRENCY
