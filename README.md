@@ -137,3 +137,21 @@ mongosh "$MONGO_URI" --file scripts/migrate_shared_mongo_to_service_dbs.js
 The migration keeps the source database intact so the rollback window remains available.
 
 For the detailed architecture and migration decisions, see `docs/architecture/microservices-migration.md`.
+
+
+## Hosted staging
+
+A Render Blueprint is available at `render.yaml` for the first hosted microservices staging environment.
+
+- Region: Frankfurt
+- Frontend: existing Vercel deployment
+- Backend: Gateway + Auth + Catalog + Orders + Payments + Notifications + Backoffice
+- Compute: free Render web services for staging
+- MongoDB: external MongoDB connection required
+- Direct business-service API calls are blocked when `GATEWAY_SHARED_TOKEN` is configured
+
+See `docs/deployment/render-staging.md` for the deployment and verification sequence.
+
+## License
+
+TKB Shop is released under the MIT License. See `LICENSE`.

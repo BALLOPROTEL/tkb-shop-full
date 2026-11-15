@@ -55,3 +55,11 @@ def test_payments_delegates_identity_to_auth():
     assert "JWT_SECRET" not in source
     assert "jwt.decode" not in source
     assert "/internal/auth/validate" in source
+
+
+def test_public_api_requires_gateway_token_when_configured(monkeypatch):
+    import app.main as service_main
+
+    monkeypatch.setattr(service_main, "GATEWAY_SHARED_TOKEN", "trusted-gateway-token")
+    response = client.post("/api/payments/create-stripe-session", json={})
+    assert response.status_code == 403

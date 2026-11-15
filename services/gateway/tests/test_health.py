@@ -142,3 +142,28 @@ def test_unknown_routes_do_not_fall_back_to_legacy():
     response = client.get("/api/legacy-only")
     assert response.status_code == 404
     assert response.headers["x-tkb-route"] == "unknown"
+
+
+def test_gateway_overrides_client_gateway_token(monkeypatch):
+    import app.main as service_main
+
+    monkeypatch.setattr(service_main, "GATEWAY_SHARED_TOKEN", "trusted-gateway-token")
+
+    async def fake_request(
+        self,
+        method,
+        url,
+        params=None,
+        content=None,
+        headers=None,
+    ):
+        assert headers["x-gateway-token"] == "trusted-gateway-token"
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+    response = client.get(
+        "/api/products",
+        headers={"X-Gateway-Token": "client-supplied-token"},
+    )
+
+    assert response.status_code == 200

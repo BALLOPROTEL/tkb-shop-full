@@ -27,6 +27,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
       MONGO_DB_NAME: ${CATALOG_MONGO_DB_NAME:-tkb_catalog}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      GATEWAY_SHARED_TOKEN: ${GATEWAY_SHARED_TOKEN:-}
       AUTH_SERVICE_URL: http://auth:8000
     depends_on:
       - mongo
@@ -42,6 +43,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
       MONGO_DB_NAME: ${AUTH_MONGO_DB_NAME:-tkb_auth}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      GATEWAY_SHARED_TOKEN: ${GATEWAY_SHARED_TOKEN:-}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       NOTIFICATIONS_SERVICE_URL: http://notifications:8000
@@ -59,6 +61,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
       MONGO_DB_NAME: ${ORDERS_MONGO_DB_NAME:-tkb_orders}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      GATEWAY_SHARED_TOKEN: ${GATEWAY_SHARED_TOKEN:-}
       PAYMENTS_SERVICE_URL: http://payments:8000
       CATALOG_SERVICE_URL: http://catalog:8000
       AUTH_SERVICE_URL: http://auth:8000
@@ -75,6 +78,7 @@ services:
     restart: unless-stopped
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      GATEWAY_SHARED_TOKEN: ${GATEWAY_SHARED_TOKEN:-}
       ORDERS_SERVICE_URL: http://orders:8000
       AUTH_SERVICE_URL: http://auth:8000
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
@@ -101,6 +105,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017}
       MONGO_DB_NAME: ${BACKOFFICE_MONGO_DB_NAME:-tkb_backoffice}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      GATEWAY_SHARED_TOKEN: ${GATEWAY_SHARED_TOKEN:-}
       AUTH_SERVICE_URL: http://auth:8000
       CATALOG_SERVICE_URL: http://catalog:8000
       ORDERS_SERVICE_URL: http://orders:8000
@@ -117,6 +122,7 @@ services:
       context: ./services/gateway
     restart: unless-stopped
     environment:
+      GATEWAY_SHARED_TOKEN: ${GATEWAY_SHARED_TOKEN:-}
       CATALOG_SERVICE_URL: http://catalog:8000
       AUTH_SERVICE_URL: http://auth:8000
       ORDERS_SERVICE_URL: http://orders:8000

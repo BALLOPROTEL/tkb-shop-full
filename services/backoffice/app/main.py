@@ -2,7 +2,8 @@ import os
 from datetime import datetime
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, EmailStr
 from pymongo import MongoClient
@@ -12,16 +13,33 @@ from app.observability import get_request_id, install_observability
 app = FastAPI(title="TKB Shop Backoffice Service", version="0.2.0")
 install_observability(app, "backoffice")
 
+
+def _service_url(name: str, default: str) -> str:
+    value = os.getenv(name, default).rstrip("/")
+    if "://" not in value:
+        value = f"https://{value}"
+    return value
+
+
+GATEWAY_SHARED_TOKEN = os.getenv("GATEWAY_SHARED_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tkb_backoffice")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
-CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
-ORDERS_SERVICE_URL = os.getenv("ORDERS_SERVICE_URL", "http://orders:8000").rstrip("/")
+AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
+CATALOG_SERVICE_URL = _service_url("CATALOG_SERVICE_URL", "http://catalog:8000")
+ORDERS_SERVICE_URL = _service_url("ORDERS_SERVICE_URL", "http://orders:8000")
 
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database(MONGO_DB_NAME)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+@app.middleware("http")
+async def require_gateway_for_public_api(request: Request, call_next):
+    if GATEWAY_SHARED_TOKEN and request.url.path.startswith("/api/"):
+        if request.headers.get("x-gateway-token") != GATEWAY_SHARED_TOKEN:
+            return JSONResponse(status_code=403, content={"detail": "Gateway requis"})
+    return await call_next(request)
 
 
 class SiteSettings(BaseModel):

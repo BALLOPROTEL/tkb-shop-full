@@ -4,7 +4,8 @@ from typing import List, Optional
 
 import httpx
 from bson import ObjectId
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
@@ -14,16 +15,33 @@ from app.observability import get_request_id, install_observability
 app = FastAPI(title="TKB Shop Orders Service", version="0.3.0")
 install_observability(app, "orders")
 
+
+def _service_url(name: str, default: str) -> str:
+    value = os.getenv(name, default).rstrip("/")
+    if "://" not in value:
+        value = f"https://{value}"
+    return value
+
+
+GATEWAY_SHARED_TOKEN = os.getenv("GATEWAY_SHARED_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tkb_orders")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
-PAYMENTS_SERVICE_URL = os.getenv("PAYMENTS_SERVICE_URL", "http://payments:8000").rstrip("/")
-CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog:8000").rstrip("/")
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8000").rstrip("/")
+PAYMENTS_SERVICE_URL = _service_url("PAYMENTS_SERVICE_URL", "http://payments:8000")
+CATALOG_SERVICE_URL = _service_url("CATALOG_SERVICE_URL", "http://catalog:8000")
+AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
 
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client.get_database(MONGO_DB_NAME)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+@app.middleware("http")
+async def require_gateway_for_public_api(request: Request, call_next):
+    if GATEWAY_SHARED_TOKEN and request.url.path.startswith("/api/"):
+        if request.headers.get("x-gateway-token") != GATEWAY_SHARED_TOKEN:
+            return JSONResponse(status_code=403, content={"detail": "Gateway requis"})
+    return await call_next(request)
 
 
 class OrderItem(BaseModel):
