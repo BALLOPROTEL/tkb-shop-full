@@ -102,6 +102,11 @@ def test_gateway_bootstrap_returns_ready_when_every_service_is_ready(monkeypatch
 
 
 def test_gateway_propagates_request_id_to_upstream(monkeypatch):
+    import app.main as service_main
+
+    async def fake_wait(client, base_url, request_id):
+        return True
+
     async def fake_request(
         self,
         method,
@@ -113,6 +118,8 @@ def test_gateway_propagates_request_id_to_upstream(monkeypatch):
         assert headers["x-request-id"] == "proxy-trace-123"
         return FakeResponse()
 
+    monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
+    monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
     monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
     response = client.get(
         "/api/products",
@@ -187,6 +194,9 @@ def test_gateway_overrides_client_gateway_token(monkeypatch):
 
     monkeypatch.setattr(service_main, "GATEWAY_SHARED_TOKEN", "trusted-gateway-token")
 
+    async def fake_wait(client, base_url, request_id):
+        return True
+
     async def fake_request(
         self,
         method,
@@ -207,7 +217,7 @@ def test_gateway_overrides_client_gateway_token(monkeypatch):
     assert response.status_code == 200
 
 
-def test_mutating_request_waits_for_service_before_forwarding(monkeypatch):
+def test_every_request_waits_for_its_target_service_before_forwarding(monkeypatch):
     calls = {"ready": 0, "request": 0}
 
     async def fake_get(self, url, headers=None, timeout=None):
@@ -242,6 +252,26 @@ def test_mutating_request_waits_for_service_before_forwarding(monkeypatch):
 
     assert response.status_code == 200
     assert calls == {"ready": 1, "request": 1}
+
+
+def test_safe_request_is_not_forwarded_until_target_service_is_ready(monkeypatch):
+    import app.main as service_main
+
+    async def fake_wait(client, base_url, request_id):
+        assert base_url == CATALOG_SERVICE_URL
+        return False
+
+    async def unexpected_request(*args, **kwargs):
+        raise AssertionError("Request must not be forwarded while catalog is asleep")
+
+    monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
+    monkeypatch.setattr(httpx.AsyncClient, "request", unexpected_request)
+
+    response = client.get("/api/products")
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
+    assert response.headers["x-tkb-route"] == "catalog"
 
 
 def test_mutating_request_is_not_forwarded_until_service_is_ready(monkeypatch):
