@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { clearAuth, getStoredToken } from './authStorage';
+import { prewarmForApiRequest, resetWakeForApiRequest } from './serviceWake';
 
 /**
  * INSTANCE API EXPERT (Axios)
@@ -14,7 +15,9 @@ const apiInstance = axios.create({
 });
 
 // Intercepteur pour injecter le Token
-apiInstance.interceptors.request.use((config) => {
+apiInstance.interceptors.request.use(async (config) => {
+    await prewarmForApiRequest(config.url, API_BASE_URL);
+
     const token = getStoredToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -32,6 +35,16 @@ apiInstance.interceptors.response.use(
                 window.location.href = '/';
             }
         }
+
+        if (
+            error.response &&
+            [502, 503, 504].includes(error.response.status) &&
+            error.config?.url
+        ) {
+            // Allow the next user retry to send a fresh external wake signal.
+            resetWakeForApiRequest(error.config.url, API_BASE_URL);
+        }
+
         return Promise.reject(error);
     }
 );
