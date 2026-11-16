@@ -119,7 +119,6 @@ def test_gateway_propagates_request_id_to_upstream(monkeypatch):
         return FakeResponse()
 
     monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
-    monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
     monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
     response = client.get(
         "/api/products",
@@ -208,6 +207,7 @@ def test_gateway_overrides_client_gateway_token(monkeypatch):
         assert headers["x-gateway-token"] == "trusted-gateway-token"
         return FakeResponse()
 
+    monkeypatch.setattr(service_main, "_wait_for_upstream_ready", fake_wait)
     monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
     response = client.get(
         "/api/products",
