@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.observability import get_request_id, install_observability
 
-app = FastAPI(title="TKB Shop API Gateway", version="1.2.0")
+app = FastAPI(title="TKB Shop API Gateway", version="1.3.0")
 install_observability(app, "gateway")
 
 
@@ -25,7 +25,6 @@ UPSTREAM_WAKE_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_WAKE_TIMEOUT_SECONDS",
 UPSTREAM_WAKE_INTERVAL_SECONDS = float(os.getenv("UPSTREAM_WAKE_INTERVAL_SECONDS", "2"))
 TRANSIENT_UPSTREAM_STATUSES = {502, 503, 504}
 SAFE_RETRY_METHODS = {"GET", "HEAD", "OPTIONS"}
-MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 CATALOG_SERVICE_URL = _service_url("CATALOG_SERVICE_URL", "http://catalog:8000")
 AUTH_SERVICE_URL = _service_url("AUTH_SERVICE_URL", "http://auth:8000")
 ORDERS_SERVICE_URL = _service_url("ORDERS_SERVICE_URL", "http://orders:8000")
@@ -229,23 +228,26 @@ async def proxy(path: str, request: Request):
     request_body = await request.body()
 
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
-        if request.method in MUTATING_METHODS:
-            ready = await _wait_for_upstream_ready(
-                client,
-                base_url,
-                request.state.request_id,
+        # On free staging, every domain service can cold-start independently.
+        # Wake only the service required by the current request instead of
+        # requiring the entire microservice stack to be ready up front.
+        ready = await _wait_for_upstream_ready(
+            client,
+            base_url,
+            request.state.request_id,
+        )
+        if not ready:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": (
+                        f"Service {routed_service} en cours de demarrage. "
+                        "La boutique reste accessible ; reessayez cette action "
+                        "dans quelques instants."
+                    )
+                },
+                headers={"x-tkb-route": routed_service, "retry-after": "5"},
             )
-            if not ready:
-                return JSONResponse(
-                    status_code=503,
-                    content={
-                        "detail": (
-                            f"Service {routed_service} en cours de demarrage. "
-                            "Reessayez dans quelques instants."
-                        )
-                    },
-                    headers={"x-tkb-route": routed_service, "retry-after": "5"},
-                )
 
         try:
             upstream = await client.request(

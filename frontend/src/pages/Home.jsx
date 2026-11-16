@@ -1,9 +1,9 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api'; // Import instance Axios corrige
 import { isNewProduct, isPromo, getDiscountPercent } from '../utils/product';
 import Hero from '../components/home/Hero';
-import { Loader2, Sparkles, Heart } from 'lucide-react';
+import { Loader2, Sparkles, Heart, RefreshCw } from 'lucide-react';
 import { useFavorites } from '../context/FavoritesContext';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
@@ -13,25 +13,32 @@ import 'swiper/css/navigation';
 const Home = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [catalogError, setCatalogError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const { toggleFavorite, isFavorite } = useFavorites();
     const [currentPage, setCurrentPage] = useState(1);
     const perPage = 16;
 
-    useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const res = await api.get('/api/products');
-                // Avec Axios, les donnees sont dans res.data
-                setProducts(res.data.reverse());
-            } catch (error) {
-                console.error("Erreur produits:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchProducts();
+    const fetchProducts = useCallback(async () => {
+        setLoading(true);
+        setCatalogError('');
+
+        try {
+            const res = await api.get('/api/products');
+            setProducts([...(res.data || [])].reverse());
+        } catch (error) {
+            console.error("Erreur produits:", error);
+            setCatalogError(
+                "Le catalogue est en cours de redemarrage. La boutique reste accessible ; reessayez dans quelques instants."
+            );
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchProducts();
+    }, [fetchProducts]);
 
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -100,8 +107,23 @@ const Home = () => {
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20">
+                    <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
                         <Loader2 className="animate-spin text-pink-600" size={32} />
+                        <p className="text-sm text-slate-500">
+                            Chargement du catalogue. Le premier acces peut prendre un peu plus de temps apres une periode d'inactivite.
+                        </p>
+                    </div>
+                ) : catalogError ? (
+                    <div className="mx-auto max-w-xl rounded-2xl border border-pink-100 bg-pink-50/60 px-6 py-8 text-center">
+                        <p className="text-sm leading-6 text-slate-600">{catalogError}</p>
+                        <button
+                            type="button"
+                            onClick={fetchProducts}
+                            className="mt-5 inline-flex items-center gap-2 bg-slate-950 px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-slate-800"
+                        >
+                            <RefreshCw size={14} />
+                            Recharger le catalogue
+                        </button>
                     </div>
                 ) : (
                     <>
